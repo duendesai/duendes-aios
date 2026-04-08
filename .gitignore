@@ -43,3 +43,6 @@ apps/web/node_modules/
 
 # Claude Code local config
 .claude/
+
+# n8n workflow backups — may contain hardcoded credentials
+workflows/backups/
