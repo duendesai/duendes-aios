@@ -1,0 +1,3 @@
+[submodule "duendes-web"]
+	path = duendes-web
+	url = https://github.com/duendesai/duendes-web.git
