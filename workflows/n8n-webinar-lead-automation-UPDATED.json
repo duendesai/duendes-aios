@@ -1,0 +1,191 @@
+{
+  "name": "Webinar Lead Automation — Wellness Campaign (con PDF)",
+  "description": "Lead Meta → Airtable + Email con RED FLAGS PDF + Recordatorio",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://n8n.duendes.net/webhook/webinar-lead",
+        "contentType": "application/json"
+      },
+      "name": "Webhook Meta Instant Form",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "application": "airtable",
+        "resource": "record",
+        "operation": "create",
+        "table": "tblyTzWUXxpWeHJaB",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "Nombre",
+              "fieldValue": "={{$json.payload.name}}"
+            },
+            {
+              "fieldId": "Email",
+              "fieldValue": "={{$json.payload.email}}"
+            },
+            {
+              "fieldId": "Teléfono",
+              "fieldValue": "={{$json.payload.phone || ''}}"
+            },
+            {
+              "fieldId": "Empresa",
+              "fieldValue": "={{$json.payload.company}}"
+            },
+            {
+              "fieldId": "Fuente",
+              "fieldValue": "webinar"
+            },
+            {
+              "fieldId": "Sector",
+              "fieldValue": "Clínicas"
+            },
+            {
+              "fieldId": "Estado",
+              "fieldValue": "Nuevo"
+            },
+            {
+              "fieldId": "Próximo seguimiento",
+              "fieldValue": "={{now().add(7, 'days').toISOString()}}"
+            }
+          ]
+        }
+      },
+      "name": "Guardar en Airtable",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@duendes.net",
+        "to": "={{$json.payload.email}}",
+        "subject": "✅ Bienvenido — Webinar IA + RED FLAGS PDF",
+        "emailType": "html",
+        "htmlEmail": "<html><body style=\"font-family: Arial, sans-serif; color: #333;\">\n<h2>¡Hola {{$json.payload.name}}!</h2>\n\n<p>Ya estás registrado.</p>\n\n<p>Tu acceso al webinar + <strong>PDF RED FLAGS de regalo</strong> te llegarán en los próximos 5 minutos.</p>\n\n<p><strong>📅 Webinar:</strong> 8 de abril a las 19:00 CET<br>\n<strong>🔗 Acceso:</strong> Confirmación + vídeo de bienvenida</p>\n\n<p>Mientras tanto, puedes ver el vídeo de introducción en la página de confirmación.</p>\n\n<p>Nos vemos en vivo. ¡Muchas gracias!</p>\n\n<p>— El equipo de Duendes</p>\n</body></html>",
+        "attachments": "={{[{ 'fileName': 'RED FLAGS - Guía para evitar malas contrataciones de IA.pdf', 'mimeType': 'application/pdf', 'data': 'file:///Users/oscargrana/duendes-aios/campaigns/RED FLAGS - duendes.pdf' }]}}"
+      },
+      "name": "Email Bienvenida con PDF",
+      "type": "n8n-nodes-base.sendGrid",
+      "typeVersion": 2,
+      "position": [650, 200]
+    },
+    {
+      "parameters": {
+        "resource": "schedule",
+        "operation": "create",
+        "triggerType": "specificDateTime",
+        "specificDateTime": "=2026-04-07T17:00:00Z",
+        "timezone": "Europe/Madrid"
+      },
+      "name": "Esperar hasta 7 de Abril",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [650, 400]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@duendes.net",
+        "to": "={{$json.payload.email}}",
+        "subject": "⏰ Recordatorio: El webinar es MAÑANA a las 19:00",
+        "emailType": "html",
+        "htmlEmail": "<html><body style=\"font-family: Arial, sans-serif; color: #333;\">\n<h2>¡Hola {{$json.payload.name}}!</h2>\n\n<p>Dentro de 24 horas empieza el webinar. ¿Todo listo?</p>\n\n<p><strong>🔗 Tu acceso:</strong> <a href=\"https://duendes.net/webinar/confirmacion?email={{$json.payload.email}}\">Entra aquí mañana a las 19:00</a></p>\n\n<p>Si no puedes asistir en vivo, te enviaremos la grabación por email.</p>\n\n<p>Hasta mañana! 🚀</p>\n\n<p>— El equipo de Duendes</p>\n</body></html>"
+      },
+      "name": "Email Recordatorio",
+      "type": "n8n-nodes-base.sendGrid",
+      "typeVersion": 2,
+      "position": [850, 400]
+    },
+    {
+      "parameters": {
+        "application": "airtable",
+        "resource": "record",
+        "operation": "update",
+        "table": "tblyTzWUXxpWeHJaB",
+        "idFieldValue": "={{$json[1].id}}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "Estado",
+              "fieldValue": "Recordatorio Enviado"
+            }
+          ]
+        }
+      },
+      "name": "Actualizar Estado en Airtable",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [850, 500]
+    }
+  ],
+  "connections": {
+    "Webhook Meta Instant Form": {
+      "main": [
+        [
+          {
+            "node": "Guardar en Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar en Airtable": {
+      "main": [
+        [
+          {
+            "node": "Email Bienvenida con PDF",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Esperar hasta 7 de Abril",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esperar hasta 7 de Abril": {
+      "main": [
+        [
+          {
+            "node": "Email Recordatorio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Recordatorio": {
+      "main": [
+        [
+          {
+            "node": "Actualizar Estado en Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "errorWorkflow": "",
+    "timezone": "Europe/Madrid",
+    "saveManualExecutions": true,
+    "executionTimeout": 3600
+  },
+  "tags": [
+    "webinar",
+    "wellness",
+    "meta-ads",
+    "automation",
+    "pdf-attachment"
+  ]
+}

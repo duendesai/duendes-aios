@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "activeInstanceId": "instance-68846ce4",
+  "instances": [
+    {
+      "id": "instance-68846ce4",
+      "name": "n8n.duendes.net · Óscar Graña",
+      "host": "https://n8n.duendes.net",
+      "syncFolder": "workflows",
+      "projectId": "44dRWDGSCkLxoTl2",
+      "projectName": "Personal",
+      "instanceIdentifier": "n8n_duendes_óscar_g",
+      "verification": {
+        "status": "verified",
+        "normalizedHost": "https://n8n.duendes.net",
+        "userId": "179cf334-34f5-40df-b382-ebfe9fbbe668",
+        "userName": "Óscar Graña",
+        "userEmail": "hola@duendes.net",
+        "lastCheckedAt": "2026-04-01T06:39:42.486Z"
+      }
+    }
+  ],
+  "host": "https://n8n.duendes.net",
+  "syncFolder": "workflows",
+  "projectId": "44dRWDGSCkLxoTl2",
+  "projectName": "Personal",
+  "instanceIdentifier": "n8n_duendes_óscar_g"
+}

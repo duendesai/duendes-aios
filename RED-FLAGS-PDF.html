@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Red Flags - Duendes</title>
+    <link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;600;700&family=Nunito+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Nunito Sans', sans-serif;
+            background-color: #f2f1eb;
+            color: #2d2d2c;
+            line-height: 1.6;
+        }
+
+        .page {
+            width: 210mm;
+            height: 297mm;
+            margin: 0 auto;
+            padding: 40px;
+            background: white;
+            page-break-after: always;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        /* PORTADA */
+        .cover-page {
+            background: linear-gradient(135deg, #fac802 0%, #fac802 100%);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 60px 40px;
+        }
+
+        .cover-page .logo {
+            width: 80px;
+            height: 80px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 12px;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+        }
+
+        .cover-page h1 {
+            font-family: 'Zilla Slab', serif;
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .cover-page p {
+            font-size: 18px;
+            margin-bottom: 50px;
+            opacity: 0.95;
+            max-width: 500px;
+        }
+
+        .cover-page .subtitle {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-top: 60px;
+        }
+
+        /* HEADER */
+        .header {
+            border-bottom: 3px solid #fac802;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+        }
+
+        .header h2 {
+            font-family: 'Zilla Slab', serif;
+            font-size: 32px;
+            color: #2d2d2c;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        /* SECCIÓN INTRO */
+        .intro-page {
+            padding: 60px 40px;
+        }
+
+        .intro-page h2 {
+            font-family: 'Zilla Slab', serif;
+            font-size: 28px;
+            color: #2d2d2c;
+            margin-bottom: 30px;
+        }
+
+        .intro-page p {
+            font-size: 15px;
+            line-height: 1.8;
+            margin-bottom: 20px;
+            color: #444;
+        }
+
+        .about-box {
+            background: #f2f1eb;
+            border-left: 4px solid #a855f7;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 4px;
+        }
+
+        .about-box h3 {
+            font-family: 'Zilla Slab', serif;
+            color: #a855f7;
+            margin-bottom: 10px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .about-box p {
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        /* RED FLAG */
+        .red-flag {
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .red-flag:last-child {
+            border-bottom: none;
+        }
+
+        .red-flag-title {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .red-flag-number {
+            font-family: 'Zilla Slab', serif;
+            background: #a855f7;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+
+        .red-flag-title h3 {
+            font-family: 'Zilla Slab', serif;
+            font-size: 16px;
+            color: #2d2d2c;
+            font-weight: 600;
+        }
+
+        .red-flag-content {
+            margin-left: 47px;
+        }
+
+        .red-flag-section {
+            margin-bottom: 12px;
+        }
+
+        .red-flag-label {
+            font-family: 'Zilla Slab', serif;
+            font-weight: 600;
+            color: #fac802;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .red-flag-text {
+            font-size: 14px;
+            color: #555;
+            line-height: 1.6;
+        }
+
+        /* CHECKLIST */
+        .checklist-page {
+            padding: 60px 40px;
+        }
+
+        .checklist-page h2 {
+            font-family: 'Zilla Slab', serif;
+            font-size: 28px;
+            color: #2d2d2c;
+            margin-bottom: 30px;
+        }
+
+        .checklist-item {
+            display: flex;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .checklist-icon {
+            color: #a855f7;
+            margin-right: 15px;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .checklist-text {
+            color: #555;
+            line-height: 1.6;
+        }
+
+        /* PREGUNTAS */
+        .questions-page {
+            padding: 60px 40px;
+        }
+
+        .questions-page h2 {
+            font-family: 'Zilla Slab', serif;
+            font-size: 28px;
+            color: #2d2d2c;
+            margin-bottom: 30px;
+        }
+
+        .question-item {
+            background: #f2f1eb;
+            padding: 15px;
+            margin-bottom: 12px;
+            border-radius: 4px;
+            border-left: 3px solid #fac802;
+        }
+
+        .question-item p {
+            font-size: 14px;
+            color: #444;
+            line-height: 1.6;
+        }
+
+        /* CONCLUSIÓN */
+        .conclusion-page {
+            padding: 60px 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            background: linear-gradient(to bottom, white 0%, #f2f1eb 100%);
+        }
+
+        .conclusion-page h2 {
+            font-family: 'Zilla Slab', serif;
+            font-size: 28px;
+            color: #2d2d2c;
+            margin-bottom: 30px;
+        }
+
+        .conclusion-page p {
+            font-size: 15px;
+            line-height: 1.8;
+            margin-bottom: 20px;
+            color: #555;
+        }
+
+        .conclusion-cta {
+            background: #a855f7;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            margin-top: 40px;
+            font-weight: 600;
+        }
+
+        .footer {
+            margin-top: 60px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 12px;
+            color: #999;
+            text-align: center;
+        }
+
+        /* PRINT */
+        @media print {
+            body {
+                margin: 0;
+                padding: 0;
+                background: white;
+            }
+            .page {
+                box-shadow: none;
+                margin-bottom: 0;
+                page-break-after: always;
+            }
+        }
+
+        @page {
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+
+<!-- PORTADA -->
+<div class="page cover-page">
+    <div class="logo">🚩</div>
+    <h1>RED FLAGS</h1>
+    <p>La guía para evitar malas contrataciones de IA</p>
+    <p style="font-size: 14px;">Cómo detectar agencias y proveedores que no te convienen antes de firmar</p>
+    <div class="subtitle">Para autónomos y pymes en España</div>
+</div>
+
+<!-- INTRODUCCIÓN -->
+<div class="page intro-page">
+    <div class="header">
+        <h2>Sobre esta guía</h2>
+        <p>Aprende a identificar señales de alarma en proveedores de IA</p>
+    </div>
+    <p>La inteligencia artificial puede ahorrar tiempo, mejorar procesos y abrir nuevas vías de crecimiento. También puede convertirse en una mala compra si eliges un proveedor que vende humo, oculta costes o no entiende tu negocio.</p>
+    
+    <p>Esta guía reúne las señales de alarma más importantes para evaluar agencias y proveedores de IA con criterio, especialmente en el contexto de autónomos y pequeñas empresas en España, donde importan tanto el resultado como la protección de datos, la claridad contractual y la viabilidad operativa.</p>
+
+    <div class="about-box">
+        <h3>Autor</h3>
+        <p><strong>Óscar Graña</strong> es fundador de Duendes y especialista en inteligencia artificial aplicada a negocio. Su enfoque está centrado en bajar la IA a procesos concretos, operativos y rentables para autónomos y pymes, evitando tanto el humo comercial como las implantaciones mal planteadas.</p>
+    </div>
+
+    <p style="margin-top: 30px; font-size: 13px; color: #999;">La idea no es desconfiar de todo, sino aprender a distinguir entre un socio serio y un proveedor oportunista.</p>
+</div>
+
+<!-- RED FLAGS 1-5 -->
+<div class="page">
+    <div class="header">
+        <h2>Red Flags</h2>
+        <p>Las 20 señales de alarma más comunes</p>
+    </div>
+
+    <div class="red-flag">
+        <div class="red-flag-title">
+            <div class="red-flag-number">1</div>
+            <h3>"Te lo transformamos todo en dos semanas"</h3>
+        </div>
+        <div class="red-flag-content">
+            <div class="red-flag-section">
+                <div class="red-flag-label">Si te dicen que:</div>
+                <div class="red-flag-text">En dos o tres semanas tendrás la empresa "automatizada" o "funcionando con IA" de punta a punta.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Lo que suele significar:</div>
+                <div class="red-flag-text">Que no han hecho discovery real, que simplifican en exceso la complejidad del proyecto o que están vendiendo velocidad por encima de calidad.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Qué hacer:</div>
+                <div class="red-flag-text">Pide cronograma por escrito con entregables concretos y fechas realistas.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="red-flag">
+        <div class="red-flag-title">
+            <div class="red-flag-number">2</div>
+            <h3>"El presupuesto ya lo iremos viendo"</h3>
+        </div>
+        <div class="red-flag-content">
+            <div class="red-flag-section">
+                <div class="red-flag-label">Si te dicen que:</div>
+                <div class="red-flag-text">Se empieza con una cifra orientativa y que después "se ajusta según vaya saliendo".</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Lo que suele significar:</div>
+                <div class="red-flag-text">Falta de alcance definido, riesgo alto de sobrecostes y margen para inflar el proyecto una vez que dependes de ellos.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Qué hacer:</div>
+                <div class="red-flag-text">Exige propuesta con alcance, precio, límites, supuestos y proceso formal para extras.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="red-flag">
+        <div class="red-flag-title">
+            <div class="red-flag-number">3</div>
+            <h3>"Tenemos una solución que vale para cualquier sector"</h3>
+        </div>
+        <div class="red-flag-content">
+            <div class="red-flag-section">
+                <div class="red-flag-label">Si te dicen que:</div>
+                <div class="red-flag-text">Su chatbot, agente o sistema sirve igual para clínicas, despachos, e-commerce, talleres o asesorías.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Lo que suele significar:</div>
+                <div class="red-flag-text">Que venden una plantilla con poco ajuste real. La IA útil depende del flujo de trabajo, del tipo de cliente y del riesgo del error.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Qué hacer:</div>
+                <div class="red-flag-text">Pide ejemplos de personalización para negocios parecidos al tuyo.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="red-flag">
+        <div class="red-flag-title">
+            <div class="red-flag-number">4</div>
+            <h3>"No hace falta entender tu operación"</h3>
+        </div>
+        <div class="red-flag-content">
+            <div class="red-flag-section">
+                <div class="red-flag-label">Si te dicen que:</div>
+                <div class="red-flag-text">No necesitan revisar tu proceso actual, ni tus herramientas, ni cómo trabaja tu equipo.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Lo que suele significar:</div>
+                <div class="red-flag-text">Que van a encajar una solución prefabricada aunque no resuelva el problema correcto.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Qué hacer:</div>
+                <div class="red-flag-text">Desconfía si quieren pasar directamente a la venta sin hacer discovery.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="red-flag">
+        <div class="red-flag-title">
+            <div class="red-flag-number">5</div>
+            <h3>"No hace falta que te expliquemos cómo funciona"</h3>
+        </div>
+        <div class="red-flag-content">
+            <div class="red-flag-section">
+                <div class="red-flag-label">Si te dicen que:</div>
+                <div class="red-flag-text">El sistema es demasiado técnico para explicarlo o que es mejor que no entres en detalles.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Lo que suele significar:</div>
+                <div class="red-flag-text">Opacidad. Y la opacidad casi siempre acaba en dependencia, mala gestión del riesgo o imposibilidad de auditar decisiones.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Qué hacer:</div>
+                <div class="red-flag-text">Pide una explicación funcional en lenguaje de negocio y un documento de arquitectura simplificado.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- RED FLAGS 6-10 -->
+<div class="page">
+    <div class="header">
+        <h2>Red Flags</h2>
+        <p>Continuación: datos, contratos y transparencia</p>
+    </div>
+
+    <div class="red-flag">
+        <div class="red-flag-title">
+            <div class="red-flag-number">6</div>
+            <h3>"Tus datos están seguros, confía"</h3>
+        </div>
+        <div class="red-flag-content">
+            <div class="red-flag-section">
+                <div class="red-flag-label">Si te dicen que:</div>
+                <div class="red-flag-text">Eso, pero no concretan dónde se almacenan los datos, quién accede, qué proveedor de modelo usan o si hay subencargados.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Lo que suele significar:</div>
+                <div class="red-flag-text">Que no tienen bien resuelta la parte crítica de protección de datos y seguridad.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Qué hacer:</div>
+                <div class="red-flag-text">Pide por escrito dónde viven los datos, quién los trata, qué herramientas intervienen y bajo qué base contractual.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="red-flag">
+        <div class="red-flag-title">
+            <div class="red-flag-number">7</div>
+            <h3>"No hace falta contrato de protección de datos"</h3>
+        </div>
+        <div class="red-flag-content">
+            <div class="red-flag-section">
+                <div class="red-flag-label">Si te dicen que:</div>
+                <div class="red-flag-text">Que con el contrato comercial basta o que el RGPD "ya se presupone".</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Lo que suele significar:</div>
+                <div class="red-flag-text">Un incumplimiento básico o un nivel de madurez muy pobre.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Qué hacer:</div>
+                <div class="red-flag-text">No firmes sin revisar la parte de protección de datos y responsabilidades.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="red-flag">
+        <div class="red-flag-title">
+            <div class="red-flag-number">8</div>
+            <h3>"Usamos varias herramientas, pero eso no importa"</h3>
+        </div>
+        <div class="red-flag-content">
+            <div class="red-flag-section">
+                <div class="red-flag-label">Si te dicen que:</div>
+                <div class="red-flag-text">Que no hace falta detallar qué modelos, plataformas o terceros usan.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Lo que suele significar:</div>
+                <div class="red-flag-text">Que hay subproveedores ocultos, dependencia tecnológica no declarada o riesgo de costes difíciles de controlar.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Qué hacer:</div>
+                <div class="red-flag-text">Pide un mapa de proveedores y subencargados.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="red-flag">
+        <div class="red-flag-title">
+            <div class="red-flag-number">9</div>
+            <h3>"No necesitas mantenimiento; esto aprende solo"</h3>
+        </div>
+        <div class="red-flag-content">
+            <div class="red-flag-section">
+                <div class="red-flag-label">Si te dicen que:</div>
+                <div class="red-flag-text">Que una vez desplegado el sistema se optimiza sin intervención y seguirá funcionando igual con el tiempo.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Lo que suele significar:</div>
+                <div class="red-flag-text">Una promesa poco seria. Los flujos cambian, los datos cambian, las integraciones se rompen.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Qué hacer:</div>
+                <div class="red-flag-text">Exige un plan de soporte, incidencias y evolución.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="red-flag">
+        <div class="red-flag-title">
+            <div class="red-flag-number">10</div>
+            <h3>"Te garantizamos un 100% de acierto"</h3>
+        </div>
+        <div class="red-flag-content">
+            <div class="red-flag-section">
+                <div class="red-flag-label">Si te dicen que:</div>
+                <div class="red-flag-text">Que la solución no se equivoca, que no alucina o que la precisión será perfecta.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Lo que suele significar:</div>
+                <div class="red-flag-text">Desconocimiento técnico o discurso comercial poco honesto.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Qué hacer:</div>
+                <div class="red-flag-text">Pide métricas, muestras reales y límites de uso recomendados.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- RED FLAGS 11-15 -->
+<div class="page">
+    <div class="header">
+        <h2>Red Flags</h2>
+        <p>Promesas infladas, formación y propiedad</p>
+    </div>
+
+    <div class="red-flag">
+        <div class="red-flag-title">
+            <div class="red-flag-number">11</div>
+            <h3>"Te prometo un 40% o 60% de mejora"</h3>
+        </div>
+        <div class="red-flag-content">
+            <div class="red-flag-section">
+                <div class="red-flag-label">Si te dicen que:</div>
+                <div class="red-flag-text">Porcentajes cerrados de ahorro o eficiencia antes de haber medido tu situación actual.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Lo que suele significar:</div>
+                <div class="red-flag-text">Que usan cifras genéricas de marketing o benchmarks ajenos a tu negocio.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Qué hacer:</div>
+                <div class="red-flag-text">Pide que el ROI se calcule sobre tu operación, no sobre una media inventada.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="red-flag">
+        <div class="red-flag-title">
+            <div class="red-flag-number">12</div>
+            <h3>"No hace falta formar a tu equipo"</h3>
+        </div>
+        <div class="red-flag-content">
+            <div class="red-flag-section">
+                <div class="red-flag-label">Si te dicen que:</div>
+                <div class="red-flag-text">Que la herramienta es tan intuitiva que nadie necesita capacitación.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Lo que suele significar:</div>
+                <div class="red-flag-text">Que infravaloran la adopción real. Muchos proyectos fallan no por la tecnología, sino por mal uso.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Qué hacer:</div>
+                <div class="red-flag-text">Incluye sesiones de formación, documentación y un responsable interno del proyecto.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="red-flag">
+        <div class="red-flag-title">
+            <div class="red-flag-number">13</div>
+            <h3>"Todo quedará en nuestra plataforma"</h3>
+        </div>
+        <div class="red-flag-content">
+            <div class="red-flag-section">
+                <div class="red-flag-label">Si te dicen que:</div>
+                <div class="red-flag-text">Que los prompts, automatizaciones, bases de conocimiento solo vivirán en su entorno y no contemplan salida.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Lo que suele significar:</div>
+                <div class="red-flag-text">Bloqueo de proveedor.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Qué hacer:</div>
+                <div class="red-flag-text">Añade una cláusula de reversibilidad o plan de salida antes de empezar.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="red-flag">
+        <div class="red-flag-title">
+            <div class="red-flag-number">14</div>
+            <h3>"El código, los flujos y los prompts son nuestros"</h3>
+        </div>
+        <div class="red-flag-content">
+            <div class="red-flag-section">
+                <div class="red-flag-label">Si te dicen que:</div>
+                <div class="red-flag-text">Que todo lo creado durante el proyecto pertenece al proveedor por defecto.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Lo que suele significar:</div>
+                <div class="red-flag-text">Que podrías pagar por algo que luego no controlas.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Qué hacer:</div>
+                <div class="red-flag-text">Aclara por contrato la titularidad de datos, prompts, automatizaciones y desarrollos a medida.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="red-flag">
+        <div class="red-flag-title">
+            <div class="red-flag-number">15</div>
+            <h3>"No hace falta revisar seguridad ni accesos"</h3>
+        </div>
+        <div class="red-flag-content">
+            <div class="red-flag-section">
+                <div class="red-flag-label">Si te dicen que:</div>
+                <div class="red-flag-text">Que basta con conectar cuentas y empezar.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Lo que suele significar:</div>
+                <div class="red-flag-text">Una mala práctica peligrosa, especialmente si piden credenciales compartidas o accesos excesivos.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Qué hacer:</div>
+                <div class="red-flag-text">Evita compartir contraseñas y exige accesos nominativos y políticas de permisos.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- RED FLAGS 16-20 -->
+<div class="page">
+    <div class="header">
+        <h2>Red Flags</h2>
+        <p>Urgencia, referencias falsas y credibilidad</p>
+    </div>
+
+    <div class="red-flag">
+        <div class="red-flag-title">
+            <div class="red-flag-number">16</div>
+            <h3>"Si falla, ya lo veremos"</h3>
+        </div>
+        <div class="red-flag-content">
+            <div class="red-flag-section">
+                <div class="red-flag-label">Si te dicen que:</div>
+                <div class="red-flag-text">Que no hace falta definir incidencias, tiempos de respuesta o niveles de servicio.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Lo que suele significar:</div>
+                <div class="red-flag-text">Que no quieren comprometerse cuando el sistema deje de funcionar o afecte al negocio.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Qué hacer:</div>
+                <div class="red-flag-text">Incluye SLA, canal de soporte, horario, escalado y responsabilidades.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="red-flag">
+        <div class="red-flag-title">
+            <div class="red-flag-number">17</div>
+            <h3>"Tenemos muchos seguidores; somos referentes"</h3>
+        </div>
+        <div class="red-flag-content">
+            <div class="red-flag-section">
+                <div class="red-flag-label">Si te dicen que:</div>
+                <div class="red-flag-text">Que su autoridad viene sobre todo de LinkedIn, vídeos o marca personal.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Lo que suele significar:</div>
+                <div class="red-flag-text">Que pueden vender muy bien, pero eso no prueba que sepan implantar soluciones útiles.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Qué hacer:</div>
+                <div class="red-flag-text">Pide referencias verificables y ejemplos reales, no solo contenido en redes.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="red-flag">
+        <div class="red-flag-title">
+            <div class="red-flag-number">18</div>
+            <h3>"Mi equipo cambia según el proyecto, pero da igual"</h3>
+        </div>
+        <div class="red-flag-content">
+            <div class="red-flag-section">
+                <div class="red-flag-label">Si te dicen que:</div>
+                <div class="red-flag-text">Que cada fase la hará gente distinta y no queda claro quién lidera o quién da soporte después.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Lo que suele significar:</div>
+                <div class="red-flag-text">Pérdida de continuidad, conocimiento disperso y dificultad para mantener el sistema meses después.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Qué hacer:</div>
+                <div class="red-flag-text">Pide nombres, roles y punto de contacto estable.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="red-flag">
+        <div class="red-flag-title">
+            <div class="red-flag-number">19</div>
+            <h3>"Decide hoy o pierdes esta oportunidad"</h3>
+        </div>
+        <div class="red-flag-content">
+            <div class="red-flag-section">
+                <div class="red-flag-label">Si te dicen que:</div>
+                <div class="red-flag-text">Que la oferta caduca ya, que hay que cerrar esta semana o que perderás ventaja.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Lo que suele significar:</div>
+                <div class="red-flag-text">Presión comercial para evitar que compares, pidas revisión legal o contrastes referencias.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Qué hacer:</div>
+                <div class="red-flag-text">No firmes bajo urgencia artificial. Si presionan demasiado, probablemente no te convienen.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="red-flag">
+        <div class="red-flag-title">
+            <div class="red-flag-number">20</div>
+            <h3>"Cumplimos todo" sin evidencias</h3>
+        </div>
+        <div class="red-flag-content">
+            <div class="red-flag-section">
+                <div class="red-flag-label">Si te dicen que:</div>
+                <div class="red-flag-text">Que cumplen RGPD, seguridad, confidencialidad, IA responsable y normativa, pero no aportan documentación.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Lo que suele significar:</div>
+                <div class="red-flag-text">Cumplimiento declarativo, no real.</div>
+            </div>
+            <div class="red-flag-section">
+                <div class="red-flag-label">Qué hacer:</div>
+                <div class="red-flag-text">Pide evidencias proporcionadas al tamaño del proyecto. Lo importante es lo que puedan demostrar.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CHECKLIST -->
+<div class="page checklist-page">
+    <div class="header">
+        <h2>Checklist antes de firmar</h2>
+        <p>Las 10 preguntas clave que debes hacer siempre</p>
+    </div>
+
+    <div class="checklist-item">
+        <div class="checklist-icon">✓</div>
+        <div class="checklist-text">¿Qué problema concreto resolvéis en nuestro caso y qué parte no resolvéis?</div>
+    </div>
+
+    <div class="checklist-item">
+        <div class="checklist-icon">✓</div>
+        <div class="checklist-text">¿Qué necesitáis entender de nuestra operación antes de presupuestar?</div>
+    </div>
+
+    <div class="checklist-item">
+        <div class="checklist-icon">✓</div>
+        <div class="checklist-text">¿Qué herramientas y proveedores externos vais a utilizar?</div>
+    </div>
+
+    <div class="checklist-item">
+        <div class="checklist-icon">✓</div>
+        <div class="checklist-text">¿Vais a tratar datos personales? Si es así, ¿cómo lo documentamos?</div>
+    </div>
+
+    <div class="checklist-item">
+        <div class="checklist-icon">✓</div>
+        <div class="checklist-text">¿Qué métricas vais a tomar como línea base y cómo mediremos resultados?</div>
+    </div>
+
+    <div class="checklist-item">
+        <div class="checklist-icon">✓</div>
+        <div class="checklist-text">¿Qué errores previsibles tiene la solución y cómo se controlan?</div>
+    </div>
+
+    <div class="checklist-item">
+        <div class="checklist-icon">✓</div>
+        <div class="checklist-text">¿Qué incluye el mantenimiento y qué se factura aparte?</div>
+    </div>
+
+    <div class="checklist-item">
+        <div class="checklist-icon">✓</div>
+        <div class="checklist-text">¿Quién será nuestro interlocutor y quién dará soporte?</div>
+    </div>
+
+    <div class="checklist-item">
+        <div class="checklist-icon">✓</div>
+        <div class="checklist-text">¿Qué nos entregáis al final y qué propiedad conservamos?</div>
+    </div>
+
+    <div class="checklist-item">
+        <div class="checklist-icon">✓</div>
+        <div class="checklist-text">¿Cómo salimos del sistema sin perder datos ni operativa?</div>
+    </div>
+</div>
+
+<!-- CONCLUSIÓN -->
+<div class="page conclusion-page">
+    <h2>La mejor compra</h2>
+    <p>La mejor compra de IA no es la más llamativa, sino la que reduce trabajo real, encaja con tu operativa y mantiene el control en tus manos.</p>
+
+    <p>Si una agencia evita preguntas, corre demasiado, promete demasiado o te deja a oscuras en datos, contrato, propiedad o soporte, no estás ante una oportunidad: estás ante una fuente probable de problemas.</p>
+
+    <p>Elegir bien no consiste en encontrar a quien hable más de IA, sino a quien mejor entienda tu negocio y sea capaz de demostrar, por escrito, cómo va a ayudarte sin generar riesgos innecesarios.</p>
+
+    <div class="conclusion-cta">
+        Webinar gratuito 8 de abril.<br>
+        Aprenderás a contratar IA sin que te estafe nadie.
+    </div>
+
+    <div class="footer">
+        Documento generado por Duendes<br>
+        Especialista en IA para tu negocio<br>
+        Marzo de 2026
+    </div>
+</div>
+
+</body>
+</html>

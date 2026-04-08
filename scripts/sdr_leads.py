@@ -328,7 +328,16 @@ async def update_lead_estado(record_id: str, nuevo_estado: str) -> Lead | None:
 
     try:
         record = await at.update_record(TABLE_LEADS, record_id, fields)
-        return Lead.from_airtable(record)
+        lead = Lead.from_airtable(record)
+        # Cross-dept automations
+        try:
+            import asyncio
+            from cross_dept import on_lead_responded
+            if nuevo_estado in {"contactado", "respondio"}:
+                asyncio.create_task(on_lead_responded(lead.nombre, lead.sector, lead.email or ""))
+        except Exception:
+            pass
+        return lead
     except Exception as exc:
         if "404" in str(exc) or "NOT_FOUND" in str(exc):
             return None

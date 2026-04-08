@@ -171,7 +171,18 @@ async def qualify_leads_batch(
         else:
             qualified.append(result)
 
-    return sorted(qualified, key=lambda r: r.score, reverse=True)
+    qualified_sorted = sorted(qualified, key=lambda r: r.score, reverse=True)
+
+    # Cross-dept automations — notify for high-scoring leads
+    try:
+        from cross_dept import on_lead_qualified
+        for result in qualified_sorted:
+            if result.score >= 7:
+                asyncio.create_task(on_lead_qualified(result.empresa, result.sector, result.score))
+    except Exception:
+        pass
+
+    return qualified_sorted
 
 
 # ---------------------------------------------------------------------------

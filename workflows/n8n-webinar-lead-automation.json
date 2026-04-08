@@ -1,0 +1,189 @@
+{
+  "name": "Webinar Lead Automation — Wellness Campaign",
+  "description": "Automación completa: Lead en Meta → Airtable → Email + Recordatorio",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://n8n.duendes.net/webhook/webinar-lead",
+        "contentType": "application/json"
+      },
+      "name": "Webhook Meta Instant Form",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "application": "airtable",
+        "resource": "record",
+        "operation": "create",
+        "table": "tblWebinarLeads",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "fldNombre",
+              "fieldValue": "={{$json.payload.name}}"
+            },
+            {
+              "fieldId": "fldEmail",
+              "fieldValue": "={{$json.payload.email}}"
+            },
+            {
+              "fieldId": "fldTelefono",
+              "fieldValue": "={{$json.payload.phone}}"
+            },
+            {
+              "fieldId": "fldTipoNegocio",
+              "fieldValue": "={{$json.payload.business_type}}"
+            },
+            {
+              "fieldId": "fldCitasDiarias",
+              "fieldValue": "={{$json.payload.daily_appointments}}"
+            },
+            {
+              "fieldId": "fldFechaRegistro",
+              "fieldValue": "={{now().toISOString()}}"
+            },
+            {
+              "fieldId": "fldEstado",
+              "fieldValue": "Registrado"
+            }
+          ]
+        }
+      },
+      "name": "Guardar en Airtable",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@duendes.net",
+        "to": "={{$json.payload.email}}",
+        "subject": "✅ Bienvenido al webinar — 8 de abril a las 19:00",
+        "emailType": "html",
+        "htmlEmail": "<h2>¡Hola {{$json.payload.name}}!</h2>\n<p>Gracias por registrarte al webinar <strong>\"IA Real: Cómo automatizar tu empresa en 2026 sin morir en el intento\"</strong>.</p>\n\n<p><strong>📅 Fecha y hora:</strong> 8 de abril de 2026 a las 19:00 CET</p>\n<p><strong>🔗 Tu acceso privado:</strong> <a href=\"https://duendes.net/webinar/confirmacion?email={{$json.payload.email}}\">Entra aquí</a></p>\n\n<p>Te enviaremos un recordatorio 1 día antes. Mientras tanto:</p>\n<ul>\n<li>Prepara tus preguntas</li>\n<li>Asegúrate de tener buena conexión</li>\n<li>Si tienes clientes esperando, avísales que estarás en vivo 2 horas</li>\n</ul>\n\n<p>Nos vemos el 8. 🚀</p>\n<p>— El equipo de Duendes</p>"
+      },
+      "name": "Email de Bienvenida",
+      "type": "n8n-nodes-base.sendGrid",
+      "typeVersion": 2,
+      "position": [650, 200]
+    },
+    {
+      "parameters": {
+        "resource": "schedule",
+        "operation": "create",
+        "triggerType": "specificDateTime",
+        "specificDateTime": "=2026-04-07T17:00:00Z",
+        "timezone": "Europe/Madrid"
+      },
+      "name": "Recordatorio 1 Día Antes",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [650, 400]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@duendes.net",
+        "to": "={{$json.payload.email}}",
+        "subject": "⏰ Recordatorio: El webinar es MAÑANA a las 19:00",
+        "emailType": "html",
+        "htmlEmail": "<h2>¡Hola {{$json.payload.name}}!</h2>\n<p>Dentro de 24 horas empieza el webinar. ¿Todo listo?</p>\n\n<p><strong>🔗 Tu acceso:</strong> <a href=\"https://duendes.net/webinar/confirmacion?email={{$json.payload.email}}\">Entra aquí mañana a las 19:00</a></p>\n\n<p>Si no puedes asistir en vivo, te enviaremos la grabación por email.</p>\n\n<p>Hasta mañana! 🚀</p>"
+      },
+      "name": "Email Recordatorio",
+      "type": "n8n-nodes-base.sendGrid",
+      "typeVersion": 2,
+      "position": [850, 400]
+    },
+    {
+      "parameters": {
+        "application": "airtable",
+        "resource": "record",
+        "operation": "update",
+        "table": "tblWebinarLeads",
+        "idFieldValue": "={{$json[1].id}}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "fldEstado",
+              "fieldValue": "Recordatorio Enviado"
+            },
+            {
+              "fieldId": "fldFechaRecordatorio",
+              "fieldValue": "={{now().toISOString()}}"
+            }
+          ]
+        }
+      },
+      "name": "Actualizar Estado en Airtable",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [850, 500]
+    }
+  ],
+  "connections": {
+    "Webhook Meta Instant Form": {
+      "main": [
+        [
+          {
+            "node": "Guardar en Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar en Airtable": {
+      "main": [
+        [
+          {
+            "node": "Email de Bienvenida",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Recordatorio 1 Día Antes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recordatorio 1 Día Antes": {
+      "main": [
+        [
+          {
+            "node": "Email Recordatorio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Recordatorio": {
+      "main": [
+        [
+          {
+            "node": "Actualizar Estado en Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "errorWorkflow": "",
+    "timezone": "Europe/Madrid",
+    "saveManualExecutions": true,
+    "executionTimeout": 3600
+  },
+  "tags": [
+    "webinar",
+    "wellness",
+    "meta-ads",
+    "automation"
+  ]
+}

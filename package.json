@@ -1,0 +1,15 @@
+{
+  "name": "duendes-aios",
+  "private": true,
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "web": "pnpm --filter web dev",
+    "api": "cd apps/api && python3 -m uvicorn main:app --reload --port 8000"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "workspaces": ["apps/*"]
+}

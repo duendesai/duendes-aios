@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "n8n-mcp": {
+      "command": "node",
+      "args": ["/Users/oscargrana/duendes-aios/tools/n8n-mcp/dist/mcp/index.js"],
+      "env": {
+        "MCP_MODE": "stdio",
+        "LOG_LEVEL": "error",
+        "DISABLE_CONSOLE_OUTPUT": "true",
+        "N8N_URL": "n8n.duendes.net",
+        "N8N_API_TOKEN": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNzljZjMzNC0zNGY1LTQwZGYtYjM4Mi1lYmZlOWZiYmU2NjgiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiOWY5MTczYWEtMmVkZi00N2Y0LWI5YzAtNjczODg5YjVkZDU1IiwiaWF0IjoxNzc0ODg5NTU3fQ.oc7tdkVKdM1hRj1_11BkmnB40N_2fSZD3xNDDXL2-LM"
+      }
+    }
+  }
+}

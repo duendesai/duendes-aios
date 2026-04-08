@@ -6,10 +6,12 @@ Genera y envía un brief de negocio cada mañana a las 8am via Telegram.
 from __future__ import annotations
 
 import os
+import re
 import sys
 import logging
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 import anthropic
 import langfuse_init  # noqa: F401 — instrumenta Anthropic automáticamente
 import httpx
@@ -62,6 +64,12 @@ try:
     _SLACK_AVAILABLE = True
 except ImportError:
     _SLACK_AVAILABLE = False
+
+try:
+    from slack_logger import get_yesterday_activity, format_activity_for_brief
+    _SLACK_LOGGER_AVAILABLE = True
+except ImportError:
+    _SLACK_LOGGER_AVAILABLE = False
 
 # ── Cargar tareas activas desde Engram ───────────────────────────────────────
 try:
@@ -269,6 +277,53 @@ def load_cs_brief() -> "str | None":
         return None
 
 
+# ── Análisis estratégico con Haiku ───────────────────────────────────────────
+def build_strategic_analysis(
+    tasks: "str | None" = None,
+    followups: "str | None" = None,
+    deals: "str | None" = None,
+    cfo: "str | None" = None,
+    cs: "str | None" = None,
+) -> Optional[str]:
+    """Call Claude Haiku for a concise strategic analysis of the current business state."""
+    try:
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+
+        parts = []
+        if tasks:
+            parts.append(f"Tareas: {tasks[:300]}")
+        if followups:
+            parts.append(f"Follow-ups SDR: {followups[:200]}")
+        if deals:
+            parts.append(f"Pipeline AE: {deals[:200]}")
+        if cfo:
+            parts.append(f"Facturas: {cfo[:150]}")
+        if cs:
+            parts.append(f"CS: {cs[:150]}")
+
+        data_summary = "\n".join(parts) if parts else "Sin datos específicos disponibles."
+
+        prompt = f"""Datos del negocio hoy:
+{data_summary}
+
+Responde con exactamente 3 puntos, en formato Slack markdown:
+1. *Insight pipeline:* [1 insight concreto sobre el estado actual del pipeline/negocio]
+2. *Acción prioritaria:* [1 acción específica a ejecutar hoy]
+3. *Riesgo a vigilar:* [1 riesgo concreto a tener en cuenta]
+
+Sé directo y accionable. Máximo 2 líneas por punto."""
+
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=600,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return response.content[0].text
+    except Exception as exc:
+        log.warning("build_strategic_analysis failed: %s", exc)
+        return None
+
+
 # ── Generar brief con Claude ─────────────────────────────────────────────────
 def generate_brief(
     context: str,
@@ -279,6 +334,7 @@ def generate_brief(
     deals: "str | None" = None,
     cfo: "str | None" = None,
     cs: "str | None" = None,
+    slack_activity: "str | None" = None,
 ) -> str:
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
@@ -340,6 +396,19 @@ Contexto del negocio:
     else:
         cs_section = ""
 
+    # Build optional Slack activity section
+    if slack_activity is not None:
+        slack_section = f"\n\n💬 **Actividad Slack AIOS**\n{slack_activity}"
+    else:
+        slack_section = ""
+
+    # Build strategic analysis section
+    strategic = build_strategic_analysis(tasks=tasks, followups=followups, deals=deals, cfo=cfo, cs=cs)
+    if strategic:
+        strategic_section = f"\n\n*🧠 Análisis Estratégico*\n{strategic}"
+    else:
+        strategic_section = ""
+
     prompt = f"""Hoy es {fecha}.
 
 Genera el brief diario de Duendes. Estructura exacta:
@@ -349,7 +418,7 @@ Genera el brief diario de Duendes. Estructura exacta:
 🎯 **Foco del día**
 [1-2 frases sobre en qué debe concentrarse Oscar hoy según la estrategia actual]
 
-{task_section}{followup_section}{posts_section}{deals_section}{cfo_section}{cs_section}
+{task_section}{followup_section}{posts_section}{deals_section}{cfo_section}{cs_section}{slack_section}{strategic_section}
 
 💡 **Idea del día**
 [1 idea de contenido para LinkedIn, prospección, o proceso interno — algo pequeño pero útil]
@@ -368,6 +437,44 @@ _Duendes AIOS · {datetime.now().strftime("%H:%M")}_"""
     )
 
     return message.content[0].text
+
+
+# ── Generar PDF del brief ────────────────────────────────────────────────────
+try:
+    from fpdf import FPDF
+    _FPDF_AVAILABLE = True
+except ImportError:
+    _FPDF_AVAILABLE = False
+
+
+class BriefPDF(FPDF if _FPDF_AVAILABLE else object):  # type: ignore[misc]
+    def header(self):
+        self.set_font('Helvetica', 'B', 16)
+        self.cell(0, 10, 'Duendes AIOS \u2014 Brief Diario', ln=True, align='C')
+        self.ln(5)
+
+
+def generate_brief_pdf(brief_text: str, fecha: str) -> Optional[str]:
+    if not _FPDF_AVAILABLE:
+        log.warning("brief: fpdf2 not installed — skipping PDF generation")
+        return None
+    try:
+        pdf = BriefPDF()
+        pdf.add_page()
+        pdf.set_font('Helvetica', size=10)
+        # Strip Slack markdown (*, _, ~)
+        clean = re.sub(r'[*_~`]', '', brief_text)
+        for line in clean.split('\n'):
+            try:
+                pdf.multi_cell(0, 6, line.encode('latin-1', 'replace').decode('latin-1'))
+            except Exception:
+                pdf.multi_cell(0, 6, line.encode('ascii', 'replace').decode('ascii'))
+        out_path = str(BASE_DIR / 'data' / f'brief_{fecha}.pdf')
+        pdf.output(out_path)
+        return out_path
+    except Exception as e:
+        log.error("brief: PDF generation failed: %s", e)
+        return None
 
 
 # ── Enviar a Telegram ────────────────────────────────────────────────────────
@@ -435,6 +542,15 @@ def main():
     else:
         log.info("Sin check-ins CS pendientes")
 
+    slack_activity_text = None
+    if _SLACK_LOGGER_AVAILABLE:
+        try:
+            activity = get_yesterday_activity()
+            if activity.get("total_messages", 0) > 0:
+                slack_activity_text = format_activity_for_brief(activity)
+        except Exception as e:
+            log.warning("brief: slack_activity failed: %s", e)
+
     brief = generate_brief(
         context,
         fecha,
@@ -444,6 +560,7 @@ def main():
         deals=deals,
         cfo=cfo,
         cs=cs,
+        slack_activity=slack_activity_text,
     )
     log.info(f"Brief generado ({len(brief)} chars)")
 
@@ -452,6 +569,43 @@ def main():
         sys.exit(1)
     if _SLACK_AVAILABLE:
         send_brief(brief)
+
+    # Generate and send PDF
+    fecha_slug = datetime.now().strftime("%Y-%m-%d")
+    pdf_path = generate_brief_pdf(brief, fecha_slug)
+    if pdf_path:
+        log.info("PDF generado: %s", pdf_path)
+        # Send via Telegram sendDocument
+        try:
+            tg_doc_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendDocument"
+            with open(pdf_path, "rb") as f:
+                r = httpx.post(
+                    tg_doc_url,
+                    data={"chat_id": OSCAR_TELEGRAM_ID},
+                    files={"document": (f"brief_{fecha_slug}.pdf", f, "application/pdf")},
+                    timeout=30,
+                )
+                r.raise_for_status()
+            log.info("PDF enviado a Telegram")
+        except Exception as exc:
+            log.error("Error enviando PDF a Telegram: %s", exc)
+        # Send via Slack if available
+        if _SLACK_AVAILABLE:
+            try:
+                from slack_notify import send_file_to_channel
+                send_file_to_channel(pdf_path, f"Brief diario {fecha_slug}")
+                log.info("PDF enviado a Slack")
+            except Exception as exc:
+                log.warning("PDF Slack send failed: %s", exc)
+
+    # Guardar brief en Notion
+    try:
+        import asyncio
+        from notion_writer import crear_brief_diario
+        asyncio.run(crear_brief_diario(fecha_slug, brief))
+        log.info("Brief guardado en Notion")
+    except Exception as exc:
+        log.warning("Notion brief failed: %s", exc)
 
     # Reporte semanal — solo los lunes
     if datetime.now().weekday() == 0:

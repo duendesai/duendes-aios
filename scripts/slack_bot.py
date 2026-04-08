@@ -60,6 +60,27 @@ try:
 except ImportError:
     _SLACK_COMMANDS_AVAILABLE = False
 
+try:
+    from slack_memory import search_dept_memory, save_dept_memory, should_save_memory
+    _ENGRAM_AVAILABLE = True
+except ImportError:
+    _ENGRAM_AVAILABLE = False
+
+try:
+    from slack_logger import log_message, save_thread_message, load_thread_history, save_task_context, load_task_context
+    _SLACK_LOGGER_AVAILABLE = True
+except ImportError:
+    _SLACK_LOGGER_AVAILABLE = False
+
+try:
+    from notion_writer import log_tarea, crear_proyecto_estructurado, agregar_nota_a_proyecto, ejecutar_proyecto
+    _NOTION_AVAILABLE = True
+except ImportError:
+    _NOTION_AVAILABLE = False
+
+# Caché thread_key → Notion page_id (en memoria, se pierde al reiniciar pero es suficiente)
+_thread_notion_page: dict[str, str] = {}
+
 # ---------------------------------------------------------------------------
 # Bootstrap
 # ---------------------------------------------------------------------------
@@ -97,7 +118,6 @@ CHANNEL_MAP: dict[str, str] = {
     "orquestador": "orchestrator",
     "general": "orchestrator",
     "marketing": "cmo",
-    "cmo": "cmo",
     "captacion": "sdr",
     "captación": "sdr",
     "sdr": "sdr",
@@ -121,6 +141,29 @@ DEPT_DISPLAY: dict[str, str] = {
     "cfo": "Finanzas",
     "cs": "Clientes",
 }
+
+# Department → channel name (resolved to IDs at startup)
+DEPT_CHANNEL_NAME: dict[str, str] = {
+    "cmo": "marketing",
+    "sdr": "captacion",
+    "ae": "ventas",
+    "coo": "operaciones",
+    "cfo": "finanzas",
+    "cs": "clientes",
+    "orchestrator": "orquestador",
+}
+
+# Populated at startup: dept → channel_id
+DEPT_CHANNEL_IDS: dict[str, str] = {}
+
+# Keywords that trigger execution mode in a thread
+_EXECUTE_KEYWORDS = ("ejecuta", "ejecutar", "execute", "hazlo", "dale", "adelante", "listo")
+
+# thread_ts → task description (for execution context)
+_thread_task_map: dict[str, str] = {}
+
+# DM channel ID de Oscar (se guarda en el primer DM)
+_oscar_dm_channel: str = ""
 
 # Keywords in @mentions that map to departments
 MENTION_MAP: dict[str, str] = {
@@ -269,6 +312,104 @@ CHANNEL_TOPICS: dict[str, str] = {
 _topics_set: bool = False
 
 
+async def fetch_dept_channel_ids(client) -> None:
+    """Resolve dept → channel_id mapping at startup."""
+    try:
+        result = await client.conversations_list(limit=200)
+        channels = result.get("channels", [])
+        for ch in channels:
+            name = ch.get("name", "")
+            ch_id = ch.get("id", "")
+            for dept, dept_ch_name in DEPT_CHANNEL_NAME.items():
+                if name == dept_ch_name:
+                    DEPT_CHANNEL_IDS[dept] = ch_id
+        logger.info("Dept channel IDs resolved: %s", DEPT_CHANNEL_IDS)
+    except Exception as exc:
+        logger.warning("fetch_dept_channel_ids failed: %s", exc)
+
+
+async def post_task_to_dept_channel(client, dept: str, task: str, plan: str) -> Optional[str]:
+    """
+    Flow:
+    1. Create a Slack Canvas with the full plan (requires canvases:write scope).
+    2. Post a notice in the channel with the canvas link.
+    3. Oscar edits the canvas → writes 'ejecuta' in the thread → Notion project is created.
+    Falls back to posting the plan directly if canvas creation fails.
+    """
+    channel_id = DEPT_CHANNEL_IDS.get(dept)
+    if not channel_id:
+        logger.warning("No channel ID for dept=%s — cannot post task", dept)
+        return None
+
+    dept_display = DEPT_DISPLAY.get(dept, dept.upper())
+    task_preview = task[:100] + ("…" if len(task) > 100 else "")
+    canvas_id = None
+
+    def _sanitize_for_canvas(md: str) -> str:
+        """Remove markdown elements Slack Canvas doesn't support."""
+        lines = []
+        for line in md.split("\n"):
+            # Strip blockquote prefix (> ) before checking content
+            content = line.strip().lstrip(">").strip()
+            # Remove thematic breaks (---, ***, ___) anywhere — unsupported inside blockquotes
+            if re.fullmatch(r'[-*_]{3,}', content):
+                continue
+            lines.append(line)
+        return "\n".join(lines)
+
+    # Step 1: create canvas with the full plan
+    if plan:
+        try:
+            canvas_result = await client.canvases_create(
+                title=f"[{dept_display}] {task_preview}",
+                document_content={"type": "markdown", "markdown": _sanitize_for_canvas(plan)},
+            )
+            canvas_id = canvas_result.get("canvas_id")
+            if canvas_id:
+                await client.canvases_access_set(
+                    canvas_id=canvas_id,
+                    access_level="write",
+                    channel_ids=[channel_id],
+                )
+                logger.info("Canvas created for #%s: %s", DEPT_CHANNEL_NAME.get(dept), canvas_id)
+        except Exception as exc:
+            logger.warning("Canvas creation failed (add canvases:write scope): %s", exc)
+
+    # Step 2: post notice in channel
+    try:
+        if canvas_id:
+            notice = (
+                f"*📋 [{dept_display}]* Propuesta lista en el canvas.\n"
+                f"Revisá, editá lo que necesites y respondé *ejecuta* en este hilo."
+            )
+        else:
+            # Fallback: post plan as text until canvases:write scope is added
+            notice = f"*📋 [{dept_display}]*\n\n{plan[:3000]}"
+
+        result = await client.chat_postMessage(
+            channel=channel_id,
+            text=notice,
+            mrkdwn=True,
+        )
+        thread_ts = result.get("ts")
+        logger.info("Task posted to #%s (thread_ts=%s)", DEPT_CHANNEL_NAME.get(dept), thread_ts)
+
+        # Fallback overflow: rest of plan in thread replies
+        if not canvas_id and plan and len(plan) > 3000:
+            for i in range(3000, len(plan), 3000):
+                await client.chat_postMessage(
+                    channel=channel_id,
+                    text=plan[i:i + 3000],
+                    thread_ts=thread_ts,
+                    mrkdwn=True,
+                )
+
+        return thread_ts
+    except Exception as exc:
+        logger.error("post_task_to_dept_channel failed for dept=%s: %s", dept, exc)
+        return None
+
+
 async def setup_channel_topics(client) -> None:
     """Set topics for each known channel. Best-effort — won't crash on failure."""
     try:
@@ -385,6 +526,12 @@ thread_history: dict[str, list] = {}
 
 
 def _get_thread_history(thread_key: str) -> list:
+    if thread_key not in thread_history and _SLACK_LOGGER_AVAILABLE:
+        # Recover thread from SQLite on restart
+        rows = load_thread_history(thread_key, limit=MAX_THREAD_MESSAGES)
+        if rows:
+            thread_history[thread_key] = rows
+            logger.info("Thread history recovered from SQLite: %s (%d msgs)", thread_key, len(rows))
     return thread_history.setdefault(thread_key, [])
 
 
@@ -394,18 +541,27 @@ def _append_message(thread_key: str, role: str, content: str) -> None:
     # Trim to max — keep most recent messages
     if len(history) > MAX_THREAD_MESSAGES:
         thread_history[thread_key] = history[-MAX_THREAD_MESSAGES:]
+    # Persist to SQLite for cross-restart recovery
+    if _SLACK_LOGGER_AVAILABLE:
+        save_thread_message(thread_key, role, content)
 
 
 # ---------------------------------------------------------------------------
 # Core Claude call
 # ---------------------------------------------------------------------------
 
-async def ask_department(dept: str, user_text: str, thread_key: str) -> str:
+async def ask_department(dept: str, user_text: str, thread_key: str, skip_notion: bool = False) -> str:
     """Call the appropriate department agent and maintain thread history."""
     dept_system = DEPT_SYSTEMS.get(dept, _GENERIC_SYSTEM)
     system = dept_system
     if _context_os:
         system = f"{system}\n\n---\n\n{_context_os}"
+
+    # Enrich system prompt with relevant Engram memory before calling Claude
+    if _ENGRAM_AVAILABLE:
+        memory_context = await search_dept_memory(dept, user_text)
+        if memory_context:
+            system = system + "\n\n---\n\n## Contexto de sesiones anteriores\n" + memory_context
 
     # Append user message to history
     _append_message(thread_key, "user", user_text)
@@ -414,12 +570,60 @@ async def ask_department(dept: str, user_text: str, thread_key: str) -> str:
     try:
         response = await anthropic_client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=1500,
+            max_tokens=4000,
             system=system,
-            messages=history[:-0] if history else [{"role": "user", "content": user_text}],
+            messages=history if history else [{"role": "user", "content": user_text}],
         )
         assistant_text = response.content[0].text
         _append_message(thread_key, "assistant", assistant_text)
+
+        # Persist important interactions to Engram
+        if _ENGRAM_AVAILABLE and should_save_memory(user_text, assistant_text):
+            await save_dept_memory(
+                dept,
+                f"Conversación {dept}: {user_text[:60]}",
+                f"Pregunta: {user_text}\n\nRespuesta: {assistant_text[:500]}",
+            )
+
+        # Respuestas largas → Notion. Si el hilo ya tiene proyecto, añadir nota; si no, crear proyecto nuevo.
+        # skip_notion=True cuando el llamador va a manejar Notion por su cuenta (ej. DM routing al canal).
+        DRAFT_THRESHOLD = 800
+        if _NOTION_AVAILABLE and len(assistant_text) > DRAFT_THRESHOLD and not skip_notion:
+            dept_display = DEPT_DISPLAY.get(dept, dept.title())
+            existing_page_id = _thread_notion_page.get(thread_key)
+
+            if existing_page_id:
+                # Hilo con proyecto existente → añadir nota dentro del proyecto
+                nota_titulo = f"Actualización — {user_text[:60].strip()}"
+                nota_url = await agregar_nota_a_proyecto(existing_page_id, nota_titulo, assistant_text)
+                if nota_url:
+                    await log_tarea(tarea=user_text[:100], dept=dept, resultado=assistant_text[:500])
+                    return (
+                        f"*[{dept_display}]* He añadido los cambios como nota en el proyecto:\n"
+                        f"→ {nota_url}\n\n"
+                        f"Revisá en Notion y cuando estés listo mandame *ejecuta*."
+                    )
+            else:
+                # Primer mensaje del hilo → crear proyecto estructurado nuevo
+                titulo = user_text[:80].strip()
+                proyecto = await crear_proyecto_estructurado(titulo, assistant_text, dept)
+                if proyecto:
+                    _thread_notion_page[thread_key] = proyecto["id"]
+                    await log_tarea(tarea=user_text[:100], dept=dept, resultado=assistant_text[:500])
+                    return (
+                        f"*[{dept_display}]* Plan guardado en Notion con Status=Inbox:\n"
+                        f"→ {proyecto['url']}\n\n"
+                        f"Editá directamente ahí. Cualquier cambio que pidas en este hilo lo añado como nota dentro del mismo proyecto."
+                    )
+
+        # Respuesta corta → Log tarea a Notion como siempre
+        if _NOTION_AVAILABLE and len(user_text) > 10:
+            await log_tarea(
+                tarea=user_text[:100],
+                dept=dept,
+                resultado=assistant_text[:500],
+            )
+
         return assistant_text
     except Exception as exc:
         logger.error("Claude call failed for dept=%s thread=%s: %s", dept, thread_key, exc)
@@ -572,24 +776,40 @@ async def handle_message(event: dict, say, client) -> None:
     ts = event.get("ts", "")
     thread_ts = event.get("thread_ts") or ts
 
-    # Resolve channel name → department
-    try:
-        channel_info = await client.conversations_info(channel=channel_id)
-        channel_name: str = channel_info["channel"].get("name", "general")
-    except Exception as exc:
-        logger.warning("Could not fetch channel info for %s: %s", channel_id, exc)
-        channel_name = "general"
+    # DMs have channel IDs starting with "D" — treat as direct conversation
+    is_dm = channel_id.startswith("D")
 
-    dept = get_channel_dept(channel_name)
-    thread_key = f"{channel_id}:{thread_ts}"
+    if is_dm:
+        # DM: always orchestrator, one continuous conversation per user
+        channel_name = "dm"
+        dept = "orchestrator"
+        thread_key = channel_id  # one conversation per DM, no thread splitting
+        # Save Oscar's DM channel for later notifications
+        global _oscar_dm_channel
+        if not _oscar_dm_channel:
+            _oscar_dm_channel = channel_id
+    else:
+        # Channel: resolve name → department
+        try:
+            channel_info = await client.conversations_info(channel=channel_id)
+            channel_name = channel_info["channel"].get("name", "general")
+        except Exception as exc:
+            logger.warning("Could not fetch channel info for %s: %s", channel_id, exc)
+            channel_name = "general"
+        dept = get_channel_dept(channel_name)
+        thread_key = f"{channel_id}:{thread_ts}"
 
     logger.info(
-        "Message in #%s → dept=%s | thread_key=%s | text_len=%d",
-        channel_name,
+        "Message in %s → dept=%s | thread_key=%s | text_len=%d",
+        f"DM:{channel_id}" if is_dm else f"#{channel_name}",
         dept,
         thread_key,
         len(text),
     )
+
+    # Log Oscar's message to SQLite history
+    if _SLACK_LOGGER_AVAILABLE:
+        log_message(channel_name, dept, text, is_bot=False, ts=event.get("ts", ""))
 
     # Set channel topics on first message (best-effort, once per process)
     global _topics_set
@@ -684,11 +904,109 @@ async def handle_message(event: dict, say, client) -> None:
                 await say(text=format_demo_prep_response(prep, prop_intent["empresa"]), thread_ts=thread_ts)
                 return
 
+    # Detect "ejecuta" in channel threads → execution mode
+    is_execute = any(kw in text.lower().split() for kw in _EXECUTE_KEYWORDS)
+
+    if not is_dm and is_execute:
+        # Execution mode: generate deliverable + create Notion project + notify Oscar
+        dept_display = DEPT_DISPLAY.get(dept, dept.upper())
+
+        # Load context: memory first, then SQLite (survives restarts)
+        task_context = _thread_task_map.get(thread_key, "")
+        if not task_context and _SLACK_LOGGER_AVAILABLE:
+            task_context = load_task_context(thread_key)
+            if task_context:
+                logger.info("Execution context loaded from SQLite for thread %s", thread_key)
+
+        # Post "working" message in thread
+        await say(text=f"_⚙️ [{dept_display}] Ejecutando..._", thread_ts=thread_ts)
+
+        if task_context:
+            execute_prompt = (
+                f"MODO EJECUCIÓN. Oscar aprobó el siguiente plan y pidió ejecutarlo.\n\n"
+                f"PLAN APROBADO (ejecuta ESTO, no inventes nada nuevo):\n{task_context}\n\n"
+                f"Instrucción de Oscar: {text}\n\n"
+                "REGLAS:\n"
+                "- Ejecuta exactamente el plan aprobado, no lo reemplaces por otro\n"
+                "- No preguntes nada, no des opciones, no hagas resúmenes del negocio\n"
+                "- Entrega el trabajo concreto pedido en el plan\n\n"
+                "Estructura:\n"
+                "## TAREAS\n- [x] Lo que hiciste\n\n"
+                "## NOTAS\nEntregable completo aquí\n\n"
+                "## PENDIENTE OSCAR\n- Solo si Oscar necesita hacer algo específico"
+            )
+        else:
+            execute_prompt = (
+                f"Oscar dice: {text}\n\n"
+                "No hay plan previo cargado. Pide a Oscar que comparta el plan que quiere ejecutar, "
+                "o que empiece una nueva tarea desde el DM con el orquestador."
+            )
+        response = await ask_department(dept, execute_prompt, thread_key)
+
+        # Create Notion project in execution mode
+        notion_result = None
+        if _NOTION_AVAILABLE:
+            titulo = task_context[:80] or text[:80]
+            notion_result = await ejecutar_proyecto(titulo, response, dept)
+
+        if _SLACK_LOGGER_AVAILABLE:
+            log_message(channel_name, dept, response, is_bot=True, ts="")
+
+        # Post completion in channel thread
+        if notion_result:
+            pendientes = notion_result.get("pendiente_oscar", [])
+            completion_msg = f"✅ *[{dept_display}]* Completado. Todo guardado en Notion:\n→ {notion_result['url']}"
+            if pendientes:
+                items = "\n".join(f"• {p}" for p in pendientes)
+                completion_msg += f"\n\n*📋 Pendiente para vos:*\n{items}"
+        else:
+            completion_msg = f"✅ *[{dept_display}]* Completado:\n\n{response[:1500]}"
+
+        await say(text=completion_msg, thread_ts=thread_ts)
+
+        # DM Oscar with Notion link
+        if notion_result and _oscar_dm_channel:
+            channel_name_dept = DEPT_CHANNEL_NAME.get(dept, dept)
+            dm_text = (
+                f"✅ *[{dept_display}]* Tarea completada en *#{channel_name_dept}*.\n"
+                f"→ {notion_result['url']}"
+            )
+            if notion_result.get("pendiente_oscar"):
+                dm_text += f"\n\n*Hay {len(notion_result['pendiente_oscar'])} tarea(s) pendiente(s) para vos en Notion.*"
+            try:
+                await client.chat_postMessage(channel=_oscar_dm_channel, text=dm_text)
+            except Exception as exc:
+                logger.warning("Could not DM Oscar: %s", exc)
+        return
+
     # Orchestrator special routing
     if dept == "orchestrator":
         routed_dept = await _route_orchestrator(text)
-        if routed_dept:
-            logger.info("Orchestrator routing detected: delegating to dept=%s", routed_dept)
+        if routed_dept and is_dm:
+            # DM → detected dept → post plan to dept channel, confirm in DM
+            logger.info("DM routing to dept=%s — posting to channel", routed_dept)
+            plan_response = await ask_department(routed_dept, text, thread_key, skip_notion=True)
+            thread_ts_posted = await post_task_to_dept_channel(client, routed_dept, text, plan_response)
+            dept_display = DEPT_DISPLAY.get(routed_dept, routed_dept.upper())
+            channel_name_dept = DEPT_CHANNEL_NAME.get(routed_dept, routed_dept)
+            if thread_ts_posted:
+                full_context = f"TAREA ORIGINAL:\n{text}\n\nPLAN DEL AGENTE:\n{plan_response}"
+                tkey = f"{DEPT_CHANNEL_IDS.get(routed_dept)}:{thread_ts_posted}"
+                _thread_task_map[tkey] = full_context
+                if _SLACK_LOGGER_AVAILABLE:
+                    save_task_context(tkey, full_context)
+                dm_confirm = (
+                    f"*[{dept_display}]* Plan enviado a *#{channel_name_dept}*.\n"
+                    f"Revisá ahí, hacé los cambios que quieras y escribí *ejecuta* en ese hilo cuando estés listo."
+                )
+            else:
+                dm_confirm = f"*[{dept_display}]* Plan listo (no pude postearlo al canal, revisá los logs):\n\n{plan_response}"
+            if _SLACK_LOGGER_AVAILABLE:
+                log_message("dm", routed_dept, dm_confirm, is_bot=True, ts="")
+            await say(text=dm_confirm)
+            return
+        elif routed_dept:
+            # Channel message routed to dept
             dept_display = DEPT_DISPLAY.get(routed_dept, routed_dept.upper())
             response = await ask_department(routed_dept, text, thread_key)
             response = f"_[Delegado a {dept_display}]_\n\n{response}"
@@ -697,7 +1015,15 @@ async def handle_message(event: dict, say, client) -> None:
     else:
         response = await ask_department(dept, text, thread_key)
 
-    await say(text=response, thread_ts=thread_ts)
+    # Log bot response to SQLite history
+    if _SLACK_LOGGER_AVAILABLE:
+        log_message(channel_name, dept, response, is_bot=True, ts="")
+
+    # DMs: conversación lineal (sin thread_ts). Canales: responder en hilo.
+    if is_dm:
+        await say(text=response)
+    else:
+        await say(text=response, thread_ts=thread_ts)
 
 
 @app.event("app_mention")
@@ -772,6 +1098,9 @@ async def main() -> None:
         logger.info("  dept=%-12s system_prompt=%d chars", dept, size)
     logger.info("  context_os=%d chars", len(_context_os))
     logger.info("Channel map: %d entries", len(CHANNEL_MAP))
+
+    # Resolve dept → channel IDs using the app's web client
+    await fetch_dept_channel_ids(app.client)
 
     handler = AsyncSocketModeHandler(app, SLACK_APP_TOKEN)
     await handler.start_async()

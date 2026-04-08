@@ -1,0 +1,1084 @@
+{
+  "updatedAt": "2026-03-31T11:51:33.483Z",
+  "createdAt": "2026-03-30T20:19:08.185Z",
+  "id": "Om22XDi7T02fya28",
+  "name": "Webinar Lead Automation — Meta Polling",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890",
+      "name": "Cada 5 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        256,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://graph.facebook.com/v19.0/1597811357941749/leads",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "access_token",
+              "value": "EAAWI9UaHcO0BRGGBqXhvZAAlaJi2walMEZBVwfjWyhrQqUmmssZAq4RhuRkvrdRj9tugz63vE3GARVZBc9tbiBAE2eMlSRqpZCXZCNZC35Yt60SFg67GNzaiF38EUNwd3KRPrYgHMZC9zdEanRkSOlnOLLavVf8ZAMKcwFWEliOCfPwWqVPPweovaLVZB03M2NTOOMjwZDZD"
+            },
+            {
+              "name": "fields",
+              "value": "id,created_time,field_data"
+            },
+            {
+              "name": "since",
+              "value": "={{ Math.floor((Date.now() - 6 * 60 * 1000) / 1000) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b2c3d4e5-f6a7-8901-b2c3-d4e5f6a78901",
+      "name": "Leer leads de Meta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        464,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-has-leads",
+              "leftValue": "={{ $json.data.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c3d4e5f6-a7b8-9012-c3d4-e5f6a7b89012",
+      "name": "¿Hay leads nuevos?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        656,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "id": "d4e5f6a7-b8c9-0123-d4e5-f6a7b8c90123",
+      "name": "Un lead por item",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        864,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const fieldData = $json.field_data || [];\nconst fields = {};\nfor (const field of fieldData) {\n  fields[field.name] = field.values ? field.values[0] : '';\n}\nreturn {\n  nombre: fields.full_name || fields.nombre || fields.name || '',\n  email: fields.email || '',\n  telefono: fields.phone_number || fields.telefono || fields.phone || '',\n  empresa: fields.company_name || fields.empresa || fields.company || '',\n  meta_lead_id: $json.id,\n  created_time: $json.created_time\n};"
+      },
+      "id": "e5f6a7b8-c9d0-1234-e5f6-a7b8c9d01234",
+      "name": "Extraer campos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appFIn3ntFb39vGXF",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblyTzWUXxpWeHJaB",
+          "mode": "id"
+        },
+        "filterByFormula": "={{ \"LOWER({Email})=\\\"\" + ($json.email || \"\").toLowerCase() + \"\\\"\" }}",
+        "returnAll": false,
+        "limit": 1,
+        "options": {}
+      },
+      "id": "f6a7b8c9-d0e1-2345-f6a7-b8c9d0e12345",
+      "name": "Buscar duplicado Airtable",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        208
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "x1uHjyxikVKPnKYS",
+          "name": "Airtable account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-is-new",
+              "leftValue": "={{ $json.id || \"\" }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a7b8c9d0-e1f2-3456-a7b8-c9d0e1f23456",
+      "name": "¿Lead nuevo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1456,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appFIn3ntFb39vGXF",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblyTzWUXxpWeHJaB",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Nombre": "={{ $('Extraer campos').item.json.nombre }}",
+            "Email": "={{ $('Extraer campos').item.json.email }}",
+            "Teléfono": "={{ $('Extraer campos').item.json.telefono }}",
+            "Empresa": "={{ $('Extraer campos').item.json.empresa }}",
+            "Fuente": "webinar",
+            "Sector": "Clínicas",
+            "Estado": "Nuevo",
+            "Próximo seguimiento": "={{ new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "b8c9d0e1-f2a3-4567-b8c9-d0e1f2a34567",
+      "name": "Crear en Airtable",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1664,
+        112
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "x1uHjyxikVKPnKYS",
+          "name": "Airtable account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Extraer campos').item.json.email }}",
+        "subject": "✅ Bienvenido — Webinar IA + tu PDF RED FLAGS",
+        "message": "=<style>\n  @import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800&family=Zilla+Slab:wght@400;600;700&display=swap');\n</style>\n\n<div style=\"max-width:640px; margin:0 auto; font-family:'Nunito Sans', Arial, Helvetica, sans-serif; color:#111111; text-align:center; overflow:hidden;\">\n\n  <img\n    src=\"https://image2url.com/r2/default/images/1774954597380-cd60dfdd-78da-42b4-968b-7a8402fe54e0.png\"\n    alt=\"Duendes\"\n    style=\"display:block; width:100%; max-width:640px; height:auto; margin:0;\"\n  >\n\n  <div style=\"padding:34px 32px 40px; text-align:center;\">\n    <h1 style=\"font-family:'Zilla Slab', Georgia, 'Times New Roman', serif; font-size:28px; line-height:1.2; margin:0 0 36px; font-weight:600; color:#111111;\">\n      Tu plaza está confirmada.\n    </h1>\n\n    <div style=\"text-align:left; font-family:'Nunito Sans', Arial, Helvetica, sans-serif; font-size:16px; line-height:1.8; color:#111111;\">\n      <p style=\"margin:0 0 18px;\">Hola {{$('Extraer campos').item.json.nombre}},</p>\n      <p style=\"margin:0 0 18px;\">gracias por apuntarte al webinar.</p>\n      <p style=\"margin:0 0 18px;\">Antes de nada, quiero dejarte clara una cosa:</p>\n      <p style=\"margin:0 0 18px;\">esta sesión no está pensada para que aprendas a automatizar procesos tú solo, ni para venderte un curso.</p>\n      <p style=\"margin:0 0 18px;\">El objetivo es mucho más simple y mucho más útil:</p>\n      <p style=\"margin:0 0 18px;\">que entiendas qué tipo de inteligencia artificial puede aportar valor real a tu empresa, en qué áreas tiene sentido aplicarla y cómo contratar este tipo de servicios con criterio, sin pagar de más ni comprar humo.</p>\n      <p style=\"margin:0 0 18px;\">Tal y como te prometí, y para que llegues al webinar con contexto, te adjunto en este mismo email el PDF:</p>\n      <p style=\"margin:0 0 22px;\"><strong>“RED FLAGS — Guía para evitar malas contrataciones de IA”</strong></p>\n      <p style=\"margin:0 0 14px;\">En el webinar vas a aprender a:</p>\n      <ul style=\"margin:0 0 34px 22px; padding:0; line-height:1.9;\">\n        <li>distinguir oportunidades reales de simple marketing</li>\n        <li>detectar en qué áreas de tu empresa puedes implementar IA ya mismo</li>\n        <li>evaluar propuestas y presupuestos con más criterio</li>\n        <li>entender qué pedir, qué evitar y cómo no sobredimensionar una solución que quizá no necesitas</li>\n      </ul>\n    </div>\n\n    <div style=\"margin:42px 0 14px;\">\n      <div style=\"font-family:'Zilla Slab', Georgia, 'Times New Roman', serif; font-size:20px; line-height:1.3; margin-bottom:8px; color:#111111;\">\n        LA CLASE SERÁ EL DÍA\n      </div>\n      <div style=\"font-family:'Zilla Slab', Georgia, 'Times New Roman', serif; font-size:44px; line-height:1; font-weight:700; margin-bottom:10px; color:#111111;\">\n        8 DE ABRIL\n      </div>\n      <div style=\"font-family:'Zilla Slab', Georgia, 'Times New Roman', serif; font-size:20px; line-height:1.3; margin-bottom:8px; color:#111111;\">\n        A LAS\n      </div>\n      <div style=\"font-family:'Nunito Sans', Arial, Helvetica, sans-serif; font-size:42px; line-height:1; font-weight:800; margin-bottom:10px; color:#111111;\">\n        19:00\n      </div>\n      <div style=\"font-family:'Zilla Slab', Georgia, 'Times New Roman', serif; font-size:14px; line-height:1.4; color:#111111;\">\n        (HORA PENINSULAR)\n      </div>\n    </div>\n\n    <div style=\"text-align:center; margin:34px 0 42px;\">\n      <div style=\"margin:0 0 20px;\">\n        <div style=\"font-family:'Zilla Slab', Georgia, 'Times New Roman', serif; font-size:18px; line-height:1.4; margin:0 0 8px; color:#111111;\">\n          AQUÍ TE DEJO EL LINK\n        </div>\n        <a href=\"https://meet.google.com/wta-qqcf-wdi?hs=224\" style=\"font-family:'Nunito Sans', Arial, Helvetica, sans-serif; color:#1155cc; font-weight:800; font-size:17px; text-decoration:underline;\">\n          UNIRME A LA CLASE\n        </a>\n      </div>\n\n      <div style=\"margin:0 0 32px;\">\n        <a href=\"https://calendar.google.com/calendar/r/eventedit?action=TEMPLATE&text=WEBINAR%20-%20C%C3%B3mo%20dar%20el%20salto%20a%20la%20Inteligencia%20Artificial&dates=20260408T170000Z%2F20260408T180000Z&stz=Europe%2FMadrid&etz=Europe%2FMadrid&details=Acceso%20a%20la%20clase%3A%20https%3A%2F%2Fmeet.google.com%2Fwta-qqcf-wdi%3Fhs%3D224%0A%0AV%C3%ADdeo%20de%20confirmaci%C3%B3n%3A%20https%3A%2F%2Fwww.duendes.net%2Fwebinar%2Fconfirmacion&location=https%3A%2F%2Fmeet.google.com%2Fwta-qqcf-wdi%3Fhs%3D224\" style=\"font-family:'Nunito Sans', Arial, Helvetica, sans-serif; color:#1155cc; font-weight:800; font-size:17px; text-decoration:underline;\">\n          GUARDARLO EN MI CALENDARIO\n        </a>\n      </div>\n\n      <div style=\"margin:0;\">\n        <div style=\"font-family:'Zilla Slab', Georgia, 'Times New Roman', serif; font-size:18px; line-height:1.4; margin:0 0 8px; color:#111111;\">\n          MIENTRAS TANTO PUEDES\n        </div>\n        <a href=\"https://www.duendes.net/webinar/confirmacion\" style=\"font-family:'Nunito Sans', Arial, Helvetica, sans-serif; color:#1155cc; font-weight:800; font-size:17px; text-decoration:underline;\">\n          VER VÍDEO DE CONFIRMACIÓN\n        </a>\n      </div>\n    </div>\n\n    <div style=\"text-align:left; font-family:'Nunito Sans', Arial, Helvetica, sans-serif; font-size:16px; line-height:1.8; color:#111111;\">\n      <p style=\"margin:0 0 18px;\">Por si no me conoces todavía, soy Óscar Graña, fundador de Duendes.</p>\n      <p style=\"margin:0 0 18px;\">Durante más de 10 años he trabajado dirigiendo equipos en áreas comerciales y de atención al cliente, y ahora mi foco está en acercar una visión útil y realista de la inteligencia artificial a autónomos y pymes.</p>\n      <p style=\"margin:0 0 18px;\">Gracias de nuevo por confiar en mí.</p>\n      <p style=\"margin:0 0 10px;\">Nos vemos en la clase.</p>\n    </div>\n\n    <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"margin:40px 0 0;\">\n      <tr>\n        <td style=\"vertical-align:middle; padding-right:18px; width:90px;\" align=\"left\">\n          <img\n            src=\"https://image2url.com/r2/default/images/1774954623598-130f5ebc-e355-4888-bd77-bf68aab84362.png\"\n            alt=\"Óscar Graña\"\n            style=\"width:72px; height:72px; object-fit:cover; border-radius:50%; display:block;\"\n          >\n        </td>\n        <td style=\"vertical-align:middle; text-align:left;\" align=\"left\">\n          <div style=\"font-family:'Nunito Sans', Arial, Helvetica, sans-serif; font-size:18px; font-weight:800; line-height:1.1; color:#111111;\">\n            ÓSCAR GRAÑA\n          </div>\n          <div style=\"font-family:'Nunito Sans', Arial, Helvetica, sans-serif; font-size:13px; color:#444444; margin-top:6px;\">\n            Fundador de Duendes · Agencia de IA\n          </div>\n          <div style=\"font-family:'Nunito Sans', Arial, Helvetica, sans-serif; font-size:13px; margin-top:6px;\">\n            <a href=\"mailto:hola@duendes.net\" style=\"color:#111111; text-decoration:none;\">hola@duendes.net</a>\n          </div>\n        </td>\n      </tr>\n    </table>\n  </div>\n</div>\n",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {
+                "property": "data"
+              }
+            ]
+          }
+        }
+      },
+      "id": "c9d0e1f2-a3b4-5678-c9d0-e1f2a3b45678",
+      "name": "Email Bienvenida",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1856,
+        112
+      ],
+      "webhookId": "f9fcccd0-e3be-400b-a20e-5b90a0c4d2a8",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "nSVw510aT4Qwb1tQ",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resume": "specificTime",
+        "dateTime": "2026-04-07T17:00:00.000Z"
+      },
+      "id": "d0e1f2a3-b4c5-6789-d0e1-f2a3b4c56789",
+      "name": "Esperar hasta 7 de Abril",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        1856,
+        304
+      ],
+      "webhookId": "2815f3ca-9b01-4178-94fa-e2312ca99f2f"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Extraer campos').item.json.email }}",
+        "subject": "⏰ Mañana a las 19:00 — Webinar IA",
+        "options": {},
+        "message": "=<style>\n  @import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800&family=Zilla+Slab:wght@400;600;700&display=swap');\n</style>\n\n<div style=\"max-width:640px; margin:0 auto; font-family:'Nunito Sans', Arial, Helvetica, sans-serif; color:#111111; text-align:center; overflow:hidden;\">\n\n  <img\n    src=\"https://image2url.com/r2/default/images/1774954597380-cd60dfdd-78da-42b4-968b-7a8402fe54e0.png\"\n    alt=\"Duendes\"\n    style=\"display:block; width:100%; max-width:640px; height:auto; margin:0;\"\n  >\n\n  <div style=\"padding:34px 32px 40px; text-align:center;\">\n    <h1 style=\"font-family:'Zilla Slab', Georgia, 'Times New Roman', serif; font-size:28px; line-height:1.2; margin:0 0 28px; font-weight:600; color:#111111;\">\n      Mañana nos vemos en directo.\n    </h1>\n\n    <div style=\"text-align:left; font-family:'Nunito Sans', Arial, Helvetica, sans-serif; font-size:16px; line-height:1.8; color:#111111;\">\n      <p style=\"margin:0 0 18px;\">Hola {{$('Extraer campos').item.json.nombre}},</p>\n      <p style=\"margin:0 0 18px;\">te recuerdo que mañana celebramos el webinar.</p>\n      <p style=\"margin:0 0 18px;\">Para aprovecharlo mejor, te recomiendo llegar con este checklist rápido:</p>\n      <ul style=\"margin:0 0 30px 22px; padding:0; line-height:1.9;\">\n        <li>entra 5 minutos antes</li>\n        <li>ven con 1 proceso real de tu empresa en mente</li>\n        <li>apunta 1 duda concreta sobre IA, automatización o proveedores</li>\n        <li>ten a mano papel o notas para llevarte ideas accionables</li>\n      </ul>\n    </div>\n\n    <div style=\"margin:34px 0 14px;\">\n      <div style=\"font-family:'Zilla Slab', Georgia, 'Times New Roman', serif; font-size:20px; line-height:1.3; margin-bottom:8px; color:#111111;\">\n        MAÑANA · 8 DE ABRIL\n      </div>\n      <div style=\"font-family:'Nunito Sans', Arial, Helvetica, sans-serif; font-size:42px; line-height:1; font-weight:800; margin-bottom:10px; color:#111111;\">\n        19:00\n      </div>\n      <div style=\"font-family:'Zilla Slab', Georgia, 'Times New Roman', serif; font-size:14px; line-height:1.4; color:#111111;\">\n        (HORA PENINSULAR)\n      </div>\n    </div>\n\n    <div style=\"text-align:center; margin:34px 0 42px;\">\n      <div style=\"margin:0 0 20px;\">\n        <div style=\"font-family:'Zilla Slab', Georgia, 'Times New Roman', serif; font-size:18px; line-height:1.4; margin:0 0 8px; color:#111111;\">\n          AQUÍ TE DEJO EL LINK\n        </div>\n        <a href=\"https://meet.google.com/wta-qqcf-wdi?hs=224\" style=\"font-family:'Nunito Sans', Arial, Helvetica, sans-serif; color:#1155cc; font-weight:800; font-size:17px; text-decoration:underline;\">\n          UNIRME A LA CLASE\n        </a>\n      </div>\n\n      <div style=\"margin:0 0 32px;\">\n        <a href=\"https://calendar.google.com/calendar/r/eventedit?action=TEMPLATE&text=WEBINAR%20-%20C%C3%B3mo%20dar%20el%20salto%20a%20la%20Inteligencia%20Artificial&dates=20260408T170000Z%2F20260408T180000Z&stz=Europe%2FMadrid&etz=Europe%2FMadrid&details=Acceso%20a%20la%20clase%3A%20https%3A%2F%2Fmeet.google.com%2Fwta-qqcf-wdi%3Fhs%3D224%0A%0AV%C3%ADdeo%20de%20confirmaci%C3%B3n%3A%20https%3A%2F%2Fwww.duendes.net%2Fwebinar%2Fconfirmacion&location=https%3A%2F%2Fmeet.google.com%2Fwta-qqcf-wdi%3Fhs%3D224\" style=\"font-family:'Nunito Sans', Arial, Helvetica, sans-serif; color:#1155cc; font-weight:800; font-size:17px; text-decoration:underline;\">\n          GUARDARLO EN MI CALENDARIO\n        </a>\n      </div>\n    </div>\n\n    <div style=\"text-align:left; font-family:'Nunito Sans', Arial, Helvetica, sans-serif; font-size:16px; line-height:1.8; color:#111111;\">\n      <p style=\"margin:0 0 18px;\">Nos vemos mañana.</p>\n      <p style=\"margin:0 0 10px;\">Óscar Graña · Duendes</p>\n    </div>\n  </div>\n</div>\n"
+      },
+      "id": "e1f2a3b4-c5d6-7890-e1f2-a3b4c5d67890",
+      "name": "Email Recordatorio",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2064,
+        304
+      ],
+      "webhookId": "37c82581-475f-4f37-bf43-957b32803ee9",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "nSVw510aT4Qwb1tQ",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://drive.google.com/uc?export=download&id=1V86-XtB7f2UQl_zGPXgG5cuFlOdkDl08",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "08d31608-30c2-4458-a863-3d398efa89cd",
+      "name": "Descargar PDF RED FLAGS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1750,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "appFIn3ntFb39vGXF",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblyTzWUXxpWeHJaB",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "Estado": "Recordatorio enviado"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "e74d1031-bbf7-4988-a7f0-4c7659bbb94b",
+      "name": "Actualizar Estado en Airtable",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        2260,
+        304
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "x1uHjyxikVKPnKYS",
+          "name": "Airtable account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cada 5 minutos": {
+      "main": [
+        [
+          {
+            "node": "Leer leads de Meta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer leads de Meta": {
+      "main": [
+        [
+          {
+            "node": "¿Hay leads nuevos?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Hay leads nuevos?": {
+      "main": [
+        [
+          {
+            "node": "Un lead por item",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Un lead por item": {
+      "main": [
+        [
+          {
+            "node": "Extraer campos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer campos": {
+      "main": [
+        [
+          {
+            "node": "Buscar duplicado Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar duplicado Airtable": {
+      "main": [
+        [
+          {
+            "node": "¿Lead nuevo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Lead nuevo?": {
+      "main": [
+        [
+          {
+            "node": "Crear en Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Crear en Airtable": {
+      "main": [
+        [
+          {
+            "node": "Descargar PDF RED FLAGS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Esperar hasta 7 de Abril",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esperar hasta 7 de Abril": {
+      "main": [
+        [
+          {
+            "node": "Email Recordatorio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descargar PDF RED FLAGS": {
+      "main": [
+        [
+          {
+            "node": "Email Bienvenida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Recordatorio": {
+      "main": [
+        [
+          {
+            "node": "Actualizar Estado en Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "timezone": "Europe/Madrid",
+    "saveManualExecutions": true,
+    "executionTimeout": 7200,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Cada 5 minutos": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "5ff6902d-6cb8-4fe5-ae43-055237f3a1b5",
+  "activeVersionId": "5ff6902d-6cb8-4fe5-ae43-055237f3a1b5",
+  "versionCounter": 96,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-30T20:19:08.185Z",
+      "createdAt": "2026-03-30T20:19:08.185Z",
+      "role": "workflow:owner",
+      "workflowId": "Om22XDi7T02fya28",
+      "projectId": "44dRWDGSCkLxoTl2",
+      "project": {
+        "updatedAt": "2026-02-17T07:28:26.065Z",
+        "createdAt": "2026-02-17T07:26:46.420Z",
+        "id": "44dRWDGSCkLxoTl2",
+        "name": "Óscar Graña <hola@duendes.net>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "179cf334-34f5-40df-b382-ebfe9fbbe668",
+        "projectRelations": [
+          {
+            "updatedAt": "2026-02-17T07:26:46.420Z",
+            "createdAt": "2026-02-17T07:26:46.420Z",
+            "userId": "179cf334-34f5-40df-b382-ebfe9fbbe668",
+            "projectId": "44dRWDGSCkLxoTl2",
+            "user": {
+              "updatedAt": "2026-03-31T08:26:11.489Z",
+              "createdAt": "2026-02-17T07:26:44.480Z",
+              "id": "179cf334-34f5-40df-b382-ebfe9fbbe668",
+              "email": "hola@duendes.net",
+              "firstName": "Óscar",
+              "lastName": "Graña",
+              "personalizationAnswers": {
+                "version": "v4",
+                "personalization_survey_submitted_at": "2026-02-17T07:28:57.419Z",
+                "personalization_survey_n8n_version": "2.7.5",
+                "companySize": "<20",
+                "companyType": "digital-agency",
+                "role": "business-owner",
+                "reportedSource": "google"
+              },
+              "settings": {
+                "userActivated": true,
+                "firstSuccessfulWorkflowId": "Qq4HCerZdxiMBys0",
+                "userActivatedAt": 1771317278493,
+                "easyAIWorkflowOnboarded": true,
+                "npsSurvey": {
+                  "responded": true,
+                  "lastShownAt": 1771608369488
+                }
+              },
+              "disabled": false,
+              "mfaEnabled": false,
+              "lastActiveAt": "2026-03-31",
+              "isPending": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-31T11:43:15.070Z",
+    "createdAt": "2026-03-31T11:43:15.070Z",
+    "versionId": "5ff6902d-6cb8-4fe5-ae43-055237f3a1b5",
+    "workflowId": "Om22XDi7T02fya28",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "minutes"
+              }
+            ]
+          }
+        },
+        "id": "a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890",
+        "name": "Cada 5 minutos",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.1,
+        "position": [
+          256,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "url": "https://graph.facebook.com/v19.0/1597811357941749/leads",
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "access_token",
+                "value": "EAAWI9UaHcO0BRGGBqXhvZAAlaJi2walMEZBVwfjWyhrQqUmmssZAq4RhuRkvrdRj9tugz63vE3GARVZBc9tbiBAE2eMlSRqpZCXZCNZC35Yt60SFg67GNzaiF38EUNwd3KRPrYgHMZC9zdEanRkSOlnOLLavVf8ZAMKcwFWEliOCfPwWqVPPweovaLVZB03M2NTOOMjwZDZD"
+              },
+              {
+                "name": "fields",
+                "value": "id,created_time,field_data"
+              },
+              {
+                "name": "since",
+                "value": "={{ Math.floor((Date.now() - 6 * 60 * 1000) / 1000) }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "b2c3d4e5-f6a7-8901-b2c3-d4e5f6a78901",
+        "name": "Leer leads de Meta",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.1,
+        "position": [
+          464,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "cond-has-leads",
+                "leftValue": "={{ $json.data.length }}",
+                "rightValue": 0,
+                "operator": {
+                  "type": "number",
+                  "operation": "gt"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "c3d4e5f6-a7b8-9012-c3d4-e5f6a7b89012",
+        "name": "¿Hay leads nuevos?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          656,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "fieldToSplitOut": "data",
+          "options": {}
+        },
+        "id": "d4e5f6a7-b8c9-0123-d4e5-f6a7b8c90123",
+        "name": "Un lead por item",
+        "type": "n8n-nodes-base.splitOut",
+        "typeVersion": 1,
+        "position": [
+          864,
+          208
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const fieldData = $json.field_data || [];\nconst fields = {};\nfor (const field of fieldData) {\n  fields[field.name] = field.values ? field.values[0] : '';\n}\nreturn {\n  nombre: fields.full_name || fields.nombre || fields.name || '',\n  email: fields.email || '',\n  telefono: fields.phone_number || fields.telefono || fields.phone || '',\n  empresa: fields.company_name || fields.empresa || fields.company || '',\n  meta_lead_id: $json.id,\n  created_time: $json.created_time\n};"
+        },
+        "id": "e5f6a7b8-c9d0-1234-e5f6-a7b8c9d01234",
+        "name": "Extraer campos",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1056,
+          208
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "search",
+          "base": {
+            "__rl": true,
+            "value": "appFIn3ntFb39vGXF",
+            "mode": "id"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tblyTzWUXxpWeHJaB",
+            "mode": "id"
+          },
+          "filterByFormula": "={{ \"LOWER({Email})=\\\"\" + ($json.email || \"\").toLowerCase() + \"\\\"\" }}",
+          "returnAll": false,
+          "limit": 1,
+          "options": {}
+        },
+        "id": "f6a7b8c9-d0e1-2345-f6a7-b8c9d0e12345",
+        "name": "Buscar duplicado Airtable",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2,
+        "position": [
+          1264,
+          208
+        ],
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "x1uHjyxikVKPnKYS",
+            "name": "Airtable account"
+          }
+        },
+        "alwaysOutputData": true
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "cond-is-new",
+                "leftValue": "={{ $json.id || \"\" }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "a7b8c9d0-e1f2-3456-a7b8-c9d0e1f23456",
+        "name": "¿Lead nuevo?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          1456,
+          208
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "create",
+          "base": {
+            "__rl": true,
+            "value": "appFIn3ntFb39vGXF",
+            "mode": "id"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tblyTzWUXxpWeHJaB",
+            "mode": "id"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "Nombre": "={{ $('Extraer campos').item.json.nombre }}",
+              "Email": "={{ $('Extraer campos').item.json.email }}",
+              "Teléfono": "={{ $('Extraer campos').item.json.telefono }}",
+              "Empresa": "={{ $('Extraer campos').item.json.empresa }}",
+              "Fuente": "webinar",
+              "Sector": "Clínicas",
+              "Estado": "Nuevo",
+              "Próximo seguimiento": "={{ new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] }}"
+            },
+            "matchingColumns": [],
+            "schema": []
+          },
+          "options": {}
+        },
+        "id": "b8c9d0e1-f2a3-4567-b8c9-d0e1f2a34567",
+        "name": "Crear en Airtable",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2,
+        "position": [
+          1664,
+          112
+        ],
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "x1uHjyxikVKPnKYS",
+            "name": "Airtable account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "sendTo": "={{ $('Extraer campos').item.json.email }}",
+          "subject": "✅ Bienvenido — Webinar IA + tu PDF RED FLAGS",
+          "message": "=<style>\n  @import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800&family=Zilla+Slab:wght@400;600;700&display=swap');\n</style>\n\n<div style=\"max-width:640px; margin:0 auto; font-family:'Nunito Sans', Arial, Helvetica, sans-serif; color:#111111; text-align:center; overflow:hidden;\">\n\n  <img\n    src=\"https://image2url.com/r2/default/images/1774954597380-cd60dfdd-78da-42b4-968b-7a8402fe54e0.png\"\n    alt=\"Duendes\"\n    style=\"display:block; width:100%; max-width:640px; height:auto; margin:0;\"\n  >\n\n  <div style=\"padding:34px 32px 40px; text-align:center;\">\n    <h1 style=\"font-family:'Zilla Slab', Georgia, 'Times New Roman', serif; font-size:28px; line-height:1.2; margin:0 0 36px; font-weight:600; color:#111111;\">\n      Tu plaza está confirmada.\n    </h1>\n\n    <div style=\"text-align:left; font-family:'Nunito Sans', Arial, Helvetica, sans-serif; font-size:16px; line-height:1.8; color:#111111;\">\n      <p style=\"margin:0 0 18px;\">Hola {{$('Extraer campos').item.json.nombre}},</p>\n      <p style=\"margin:0 0 18px;\">gracias por apuntarte al webinar.</p>\n      <p style=\"margin:0 0 18px;\">Antes de nada, quiero dejarte clara una cosa:</p>\n      <p style=\"margin:0 0 18px;\">esta sesión no está pensada para que aprendas a automatizar procesos tú solo, ni para venderte un curso.</p>\n      <p style=\"margin:0 0 18px;\">El objetivo es mucho más simple y mucho más útil:</p>\n      <p style=\"margin:0 0 18px;\">que entiendas qué tipo de inteligencia artificial puede aportar valor real a tu empresa, en qué áreas tiene sentido aplicarla y cómo contratar este tipo de servicios con criterio, sin pagar de más ni comprar humo.</p>\n      <p style=\"margin:0 0 18px;\">Tal y como te prometí, y para que llegues al webinar con contexto, te adjunto en este mismo email el PDF:</p>\n      <p style=\"margin:0 0 22px;\"><strong>“RED FLAGS — Guía para evitar malas contrataciones de IA”</strong></p>\n      <p style=\"margin:0 0 14px;\">En el webinar vas a aprender a:</p>\n      <ul style=\"margin:0 0 34px 22px; padding:0; line-height:1.9;\">\n        <li>distinguir oportunidades reales de simple marketing</li>\n        <li>detectar en qué áreas de tu empresa puedes implementar IA ya mismo</li>\n        <li>evaluar propuestas y presupuestos con más criterio</li>\n        <li>entender qué pedir, qué evitar y cómo no sobredimensionar una solución que quizá no necesitas</li>\n      </ul>\n    </div>\n\n    <div style=\"margin:42px 0 14px;\">\n      <div style=\"font-family:'Zilla Slab', Georgia, 'Times New Roman', serif; font-size:20px; line-height:1.3; margin-bottom:8px; color:#111111;\">\n        LA CLASE SERÁ EL DÍA\n      </div>\n      <div style=\"font-family:'Zilla Slab', Georgia, 'Times New Roman', serif; font-size:44px; line-height:1; font-weight:700; margin-bottom:10px; color:#111111;\">\n        8 DE ABRIL\n      </div>\n      <div style=\"font-family:'Zilla Slab', Georgia, 'Times New Roman', serif; font-size:20px; line-height:1.3; margin-bottom:8px; color:#111111;\">\n        A LAS\n      </div>\n      <div style=\"font-family:'Nunito Sans', Arial, Helvetica, sans-serif; font-size:42px; line-height:1; font-weight:800; margin-bottom:10px; color:#111111;\">\n        19:00\n      </div>\n      <div style=\"font-family:'Zilla Slab', Georgia, 'Times New Roman', serif; font-size:14px; line-height:1.4; color:#111111;\">\n        (HORA PENINSULAR)\n      </div>\n    </div>\n\n    <div style=\"text-align:center; margin:34px 0 42px;\">\n      <div style=\"margin:0 0 20px;\">\n        <div style=\"font-family:'Zilla Slab', Georgia, 'Times New Roman', serif; font-size:18px; line-height:1.4; margin:0 0 8px; color:#111111;\">\n          AQUÍ TE DEJO EL LINK\n        </div>\n        <a href=\"https://meet.google.com/wta-qqcf-wdi?hs=224\" style=\"font-family:'Nunito Sans', Arial, Helvetica, sans-serif; color:#1155cc; font-weight:800; font-size:17px; text-decoration:underline;\">\n          UNIRME A LA CLASE\n        </a>\n      </div>\n\n      <div style=\"margin:0 0 32px;\">\n        <a href=\"https://calendar.google.com/calendar/r/eventedit?action=TEMPLATE&text=WEBINAR%20-%20C%C3%B3mo%20dar%20el%20salto%20a%20la%20Inteligencia%20Artificial&dates=20260408T170000Z%2F20260408T180000Z&stz=Europe%2FMadrid&etz=Europe%2FMadrid&details=Acceso%20a%20la%20clase%3A%20https%3A%2F%2Fmeet.google.com%2Fwta-qqcf-wdi%3Fhs%3D224%0A%0AV%C3%ADdeo%20de%20confirmaci%C3%B3n%3A%20https%3A%2F%2Fwww.duendes.net%2Fwebinar%2Fconfirmacion&location=https%3A%2F%2Fmeet.google.com%2Fwta-qqcf-wdi%3Fhs%3D224\" style=\"font-family:'Nunito Sans', Arial, Helvetica, sans-serif; color:#1155cc; font-weight:800; font-size:17px; text-decoration:underline;\">\n          GUARDARLO EN MI CALENDARIO\n        </a>\n      </div>\n\n      <div style=\"margin:0;\">\n        <div style=\"font-family:'Zilla Slab', Georgia, 'Times New Roman', serif; font-size:18px; line-height:1.4; margin:0 0 8px; color:#111111;\">\n          MIENTRAS TANTO PUEDES\n        </div>\n        <a href=\"https://www.duendes.net/webinar/confirmacion\" style=\"font-family:'Nunito Sans', Arial, Helvetica, sans-serif; color:#1155cc; font-weight:800; font-size:17px; text-decoration:underline;\">\n          VER VÍDEO DE CONFIRMACIÓN\n        </a>\n      </div>\n    </div>\n\n    <div style=\"text-align:left; font-family:'Nunito Sans', Arial, Helvetica, sans-serif; font-size:16px; line-height:1.8; color:#111111;\">\n      <p style=\"margin:0 0 18px;\">Por si no me conoces todavía, soy Óscar Graña, fundador de Duendes.</p>\n      <p style=\"margin:0 0 18px;\">Durante más de 10 años he trabajado dirigiendo equipos en áreas comerciales y de atención al cliente, y ahora mi foco está en acercar una visión útil y realista de la inteligencia artificial a autónomos y pymes.</p>\n      <p style=\"margin:0 0 18px;\">Gracias de nuevo por confiar en mí.</p>\n      <p style=\"margin:0 0 10px;\">Nos vemos en la clase.</p>\n    </div>\n\n    <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"margin:40px 0 0;\">\n      <tr>\n        <td style=\"vertical-align:middle; padding-right:18px; width:90px;\" align=\"left\">\n          <img\n            src=\"https://image2url.com/r2/default/images/1774954623598-130f5ebc-e355-4888-bd77-bf68aab84362.png\"\n            alt=\"Óscar Graña\"\n            style=\"width:72px; height:72px; object-fit:cover; border-radius:50%; display:block;\"\n          >\n        </td>\n        <td style=\"vertical-align:middle; text-align:left;\" align=\"left\">\n          <div style=\"font-family:'Nunito Sans', Arial, Helvetica, sans-serif; font-size:18px; font-weight:800; line-height:1.1; color:#111111;\">\n            ÓSCAR GRAÑA\n          </div>\n          <div style=\"font-family:'Nunito Sans', Arial, Helvetica, sans-serif; font-size:13px; color:#444444; margin-top:6px;\">\n            Fundador de Duendes · Agencia de IA\n          </div>\n          <div style=\"font-family:'Nunito Sans', Arial, Helvetica, sans-serif; font-size:13px; margin-top:6px;\">\n            <a href=\"mailto:hola@duendes.net\" style=\"color:#111111; text-decoration:none;\">hola@duendes.net</a>\n          </div>\n        </td>\n      </tr>\n    </table>\n  </div>\n</div>\n",
+          "options": {
+            "attachmentsUi": {
+              "attachmentsBinary": [
+                {
+                  "property": "data"
+                }
+              ]
+            }
+          }
+        },
+        "id": "c9d0e1f2-a3b4-5678-c9d0-e1f2a3b45678",
+        "name": "Email Bienvenida",
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2.1,
+        "position": [
+          1856,
+          112
+        ],
+        "webhookId": "f9fcccd0-e3be-400b-a20e-5b90a0c4d2a8",
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "nSVw510aT4Qwb1tQ",
+            "name": "Gmail account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "resume": "specificTime",
+          "dateTime": "2026-04-07T17:00:00.000Z"
+        },
+        "id": "d0e1f2a3-b4c5-6789-d0e1-f2a3b4c56789",
+        "name": "Esperar hasta 7 de Abril",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1,
+        "position": [
+          1856,
+          304
+        ],
+        "webhookId": "2815f3ca-9b01-4178-94fa-e2312ca99f2f"
+      },
+      {
+        "parameters": {
+          "sendTo": "={{ $('Extraer campos').item.json.email }}",
+          "subject": "⏰ Mañana a las 19:00 — Webinar IA",
+          "options": {},
+          "message": "=<style>\n  @import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800&family=Zilla+Slab:wght@400;600;700&display=swap');\n</style>\n\n<div style=\"max-width:640px; margin:0 auto; font-family:'Nunito Sans', Arial, Helvetica, sans-serif; color:#111111; text-align:center; overflow:hidden;\">\n\n  <img\n    src=\"https://image2url.com/r2/default/images/1774954597380-cd60dfdd-78da-42b4-968b-7a8402fe54e0.png\"\n    alt=\"Duendes\"\n    style=\"display:block; width:100%; max-width:640px; height:auto; margin:0;\"\n  >\n\n  <div style=\"padding:34px 32px 40px; text-align:center;\">\n    <h1 style=\"font-family:'Zilla Slab', Georgia, 'Times New Roman', serif; font-size:28px; line-height:1.2; margin:0 0 28px; font-weight:600; color:#111111;\">\n      Mañana nos vemos en directo.\n    </h1>\n\n    <div style=\"text-align:left; font-family:'Nunito Sans', Arial, Helvetica, sans-serif; font-size:16px; line-height:1.8; color:#111111;\">\n      <p style=\"margin:0 0 18px;\">Hola {{$('Extraer campos').item.json.nombre}},</p>\n      <p style=\"margin:0 0 18px;\">te recuerdo que mañana celebramos el webinar.</p>\n      <p style=\"margin:0 0 18px;\">Para aprovecharlo mejor, te recomiendo llegar con este checklist rápido:</p>\n      <ul style=\"margin:0 0 30px 22px; padding:0; line-height:1.9;\">\n        <li>entra 5 minutos antes</li>\n        <li>ven con 1 proceso real de tu empresa en mente</li>\n        <li>apunta 1 duda concreta sobre IA, automatización o proveedores</li>\n        <li>ten a mano papel o notas para llevarte ideas accionables</li>\n      </ul>\n    </div>\n\n    <div style=\"margin:34px 0 14px;\">\n      <div style=\"font-family:'Zilla Slab', Georgia, 'Times New Roman', serif; font-size:20px; line-height:1.3; margin-bottom:8px; color:#111111;\">\n        MAÑANA · 8 DE ABRIL\n      </div>\n      <div style=\"font-family:'Nunito Sans', Arial, Helvetica, sans-serif; font-size:42px; line-height:1; font-weight:800; margin-bottom:10px; color:#111111;\">\n        19:00\n      </div>\n      <div style=\"font-family:'Zilla Slab', Georgia, 'Times New Roman', serif; font-size:14px; line-height:1.4; color:#111111;\">\n        (HORA PENINSULAR)\n      </div>\n    </div>\n\n    <div style=\"text-align:center; margin:34px 0 42px;\">\n      <div style=\"margin:0 0 20px;\">\n        <div style=\"font-family:'Zilla Slab', Georgia, 'Times New Roman', serif; font-size:18px; line-height:1.4; margin:0 0 8px; color:#111111;\">\n          AQUÍ TE DEJO EL LINK\n        </div>\n        <a href=\"https://meet.google.com/wta-qqcf-wdi?hs=224\" style=\"font-family:'Nunito Sans', Arial, Helvetica, sans-serif; color:#1155cc; font-weight:800; font-size:17px; text-decoration:underline;\">\n          UNIRME A LA CLASE\n        </a>\n      </div>\n\n      <div style=\"margin:0 0 32px;\">\n        <a href=\"https://calendar.google.com/calendar/r/eventedit?action=TEMPLATE&text=WEBINAR%20-%20C%C3%B3mo%20dar%20el%20salto%20a%20la%20Inteligencia%20Artificial&dates=20260408T170000Z%2F20260408T180000Z&stz=Europe%2FMadrid&etz=Europe%2FMadrid&details=Acceso%20a%20la%20clase%3A%20https%3A%2F%2Fmeet.google.com%2Fwta-qqcf-wdi%3Fhs%3D224%0A%0AV%C3%ADdeo%20de%20confirmaci%C3%B3n%3A%20https%3A%2F%2Fwww.duendes.net%2Fwebinar%2Fconfirmacion&location=https%3A%2F%2Fmeet.google.com%2Fwta-qqcf-wdi%3Fhs%3D224\" style=\"font-family:'Nunito Sans', Arial, Helvetica, sans-serif; color:#1155cc; font-weight:800; font-size:17px; text-decoration:underline;\">\n          GUARDARLO EN MI CALENDARIO\n        </a>\n      </div>\n    </div>\n\n    <div style=\"text-align:left; font-family:'Nunito Sans', Arial, Helvetica, sans-serif; font-size:16px; line-height:1.8; color:#111111;\">\n      <p style=\"margin:0 0 18px;\">Nos vemos mañana.</p>\n      <p style=\"margin:0 0 10px;\">Óscar Graña · Duendes</p>\n    </div>\n  </div>\n</div>\n"
+        },
+        "id": "e1f2a3b4-c5d6-7890-e1f2-a3b4c5d67890",
+        "name": "Email Recordatorio",
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2.1,
+        "position": [
+          2064,
+          304
+        ],
+        "webhookId": "37c82581-475f-4f37-bf43-957b32803ee9",
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "nSVw510aT4Qwb1tQ",
+            "name": "Gmail account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "url": "https://drive.google.com/uc?export=download&id=1V86-XtB7f2UQl_zGPXgG5cuFlOdkDl08",
+          "options": {
+            "response": {
+              "response": {
+                "responseFormat": "file"
+              }
+            }
+          }
+        },
+        "id": "08d31608-30c2-4458-a863-3d398efa89cd",
+        "name": "Descargar PDF RED FLAGS",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1750,
+          112
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "update",
+          "base": {
+            "__rl": true,
+            "value": "appFIn3ntFb39vGXF",
+            "mode": "id"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tblyTzWUXxpWeHJaB",
+            "mode": "id"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "id": "={{ $json.id }}",
+              "Estado": "Recordatorio enviado"
+            },
+            "matchingColumns": [
+              "id"
+            ],
+            "schema": []
+          },
+          "options": {}
+        },
+        "id": "e74d1031-bbf7-4988-a7f0-4c7659bbb94b",
+        "name": "Actualizar Estado en Airtable",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2,
+        "position": [
+          2260,
+          304
+        ],
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "x1uHjyxikVKPnKYS",
+            "name": "Airtable account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Cada 5 minutos": {
+        "main": [
+          [
+            {
+              "node": "Leer leads de Meta",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Leer leads de Meta": {
+        "main": [
+          [
+            {
+              "node": "¿Hay leads nuevos?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "¿Hay leads nuevos?": {
+        "main": [
+          [
+            {
+              "node": "Un lead por item",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          []
+        ]
+      },
+      "Un lead por item": {
+        "main": [
+          [
+            {
+              "node": "Extraer campos",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extraer campos": {
+        "main": [
+          [
+            {
+              "node": "Buscar duplicado Airtable",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Buscar duplicado Airtable": {
+        "main": [
+          [
+            {
+              "node": "¿Lead nuevo?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "¿Lead nuevo?": {
+        "main": [
+          [
+            {
+              "node": "Crear en Airtable",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          []
+        ]
+      },
+      "Crear en Airtable": {
+        "main": [
+          [
+            {
+              "node": "Descargar PDF RED FLAGS",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Esperar hasta 7 de Abril",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Esperar hasta 7 de Abril": {
+        "main": [
+          [
+            {
+              "node": "Email Recordatorio",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Descargar PDF RED FLAGS": {
+        "main": [
+          [
+            {
+              "node": "Email Bienvenida",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Email Recordatorio": {
+        "main": [
+          [
+            {
+              "node": "Actualizar Estado en Airtable",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Óscar Graña",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-31T11:43:15.226Z",
+        "id": 119,
+        "workflowId": "Om22XDi7T02fya28",
+        "versionId": "5ff6902d-6cb8-4fe5-ae43-055237f3a1b5",
+        "event": "activated",
+        "userId": "179cf334-34f5-40df-b382-ebfe9fbbe668"
+      },
+      {
+        "createdAt": "2026-03-31T11:43:16.010Z",
+        "id": 120,
+        "workflowId": "Om22XDi7T02fya28",
+        "versionId": "5ff6902d-6cb8-4fe5-ae43-055237f3a1b5",
+        "event": "activated",
+        "userId": "179cf334-34f5-40df-b382-ebfe9fbbe668"
+      },
+      {
+        "createdAt": "2026-03-31T11:51:33.666Z",
+        "id": 121,
+        "workflowId": "Om22XDi7T02fya28",
+        "versionId": "5ff6902d-6cb8-4fe5-ae43-055237f3a1b5",
+        "event": "activated",
+        "userId": "179cf334-34f5-40df-b382-ebfe9fbbe668"
+      }
+    ]
+  }
+}

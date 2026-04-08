@@ -253,7 +253,18 @@ async def update_deal_estado(
         fields["Razón perdido"] = razon_perdido.strip()
     try:
         record = await at.update_record(TABLE_DEALS, record_id, fields)
-        return Deal.from_airtable(record)
+        deal = Deal.from_airtable(record)
+        # Cross-dept automations
+        try:
+            import asyncio
+            from cross_dept import on_deal_lost, on_deal_won
+            if nuevo_estado == "ganado":
+                asyncio.create_task(on_deal_won(deal.empresa, deal.sector, deal.notas or ""))
+            elif nuevo_estado == "perdido":
+                asyncio.create_task(on_deal_lost(deal.empresa, deal.sector))
+        except Exception:
+            pass
+        return deal
     except Exception as exc:
         if "404" in str(exc):
             return None

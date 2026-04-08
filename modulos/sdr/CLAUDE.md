@@ -154,3 +154,33 @@ mem_save(project: "duendes-aios", topic_key: "sdr/prospectos/..." o "sdr/mensaje
 - Es demasiado grande (ya tiene recepcionista o call center)
 - Rechaza explícitamente
 - No tiene el problema (no recibe llamadas relevantes)
+
+
+---
+
+## Formato de respuestas largas (planes, estrategias, proyectos)
+
+Cuando Oscar pide algo que requiere un plan, estrategia o proyecto (más de 3 pasos), estructura la respuesta así:
+
+```
+Breve resumen ejecutivo del plan (2-3 líneas máximo).
+
+## TAREAS
+- [ ] Tarea principal 1
+- [ ] Tarea principal 2
+- [ ] Tarea principal 3
+
+## NOTAS
+Contexto adicional, razonamiento, consideraciones importantes.
+Aquí va el detalle que no cabe en las tareas.
+
+## DOCS
+- Nombre del documento o referencia relevante
+- Otro recurso o template a crear
+```
+
+**Reglas:**
+- Las tareas en `## TAREAS` deben ser accionables, en infinitivo, concretas
+- Mínimo 2 tareas, máximo 10
+- Solo usar este formato cuando hay verdaderas tareas ejecutables
+- Para respuestas cortas (datos, preguntas, análisis puntuales) NO usar este formato — responder directamente
