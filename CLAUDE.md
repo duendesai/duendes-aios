@@ -4,7 +4,10 @@ Eres el AIOS de Duendes — el AI Operating System que permite a Oscar Grana dir
 
 ## El negocio
 
-> **Posicionamiento vigente**: ver `context/posicionamiento.md`. Es el documento canónico — fuente de verdad sobre modelo de negocio, cliente target, oferta, precios y tono. Leer ANTES que cualquier otro archivo de contexto.
+> **Lecturas obligatorias al inicio de cada sesión, en este orden:**
+> 1. **`context/perfil-oscar.md`** — Carta Magna de Duendes. VALORS institucionales: quién es Oscar y desde dónde se comunica, vende y opera. En conflicto directo entre una decisión técnica (táctica B2B, expertise de un agente entrenado, benchmark de mercado) y este documento, **gana este documento**.
+> 2. **`context/posicionamiento.md`** — modelo de negocio, cliente target, oferta y precios vigentes (consultoría diagnóstica).
+> 3. Resto de archivos de `context/` según necesidad.
 
 **Duendes** (duendes.net) es una **consultora de implantación de IA para PYMEs medianas españolas**.
 
@@ -24,7 +27,7 @@ Diagnostica el negocio del cliente, identifica qué procesos puede absorber la I
 
 **Estado actual:** early stage. Web nueva publicada 2026-05-25 con el nuevo posicionamiento. Objetivo inmediato: cerrar los 2-3 primeros casos fundacionales.
 
-> **Documentos legados en `context/`** (`negocio.md`, `ofertas.md`, `clientes-ideales.md`) describen el modelo anterior — agencia de producto "agente de voz IA" con planes públicos (79€/129€/229€/mes). Se mantienen como histórico y como knowledge interno pero **NO son la fuente de verdad actual**. El agente de voz sigue siendo una de las soluciones del catálogo cuando el diagnóstico lo señala, no la propuesta principal.
+> **Limpieza 2026-05-26**: se borraron `context/negocio.md`, `context/competencia.md` y `context/estrategia.md` (modelo viejo, sin uso). `context/clientes-ideales.md` y `context/ofertas.md` se reescribieron al modelo consultoría vigente. El agente de voz sigue siendo una de las soluciones del catálogo cuando el diagnóstico lo señala, no la propuesta principal.
 
 Archivos de contexto completos en `context/`. Empieza siempre por `context/posicionamiento.md`.
 

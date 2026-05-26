@@ -9,10 +9,10 @@ Evalúa leads del pipeline contra el ICP de Duendes y los prioriza para contacto
 ## Criterios de Calificación
 
 ### Score 8-10: Contactar ya
-- Sector prioritario (fisio/quiro/dental/estetica)
-- 1-5 empleados confirmado
-- Señales de problema (menciona llamadas perdidas, sin recepcionista)
-- Dueño identificado
+- Vertical Fase 0 (despachos profesionales: abogados, gestorías, asesorías)
+- 4-30 empleados confirmado (PYME mediana)
+- Señales de procesos repetibles (carga administrativa alta, cuello de botella en el titular)
+- Titular fundador o socio director identificado
 
 ### Score 6-7: Contactar pronto
 - Sector secundario O sector primario sin confirmar tamaño

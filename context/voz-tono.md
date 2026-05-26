@@ -1,3 +1,16 @@
+# Identidad que firma este copy — fuente: `context/perfil-oscar.md`
+
+> **Antes de leer las reglas de tono que vienen abajo, lee `context/perfil-oscar.md`.** Ese documento son los VALORS institucionales de Duendes: quién es Oscar y desde dónde se comunica. Este archivo (`voz-tono.md`) son **reglas tácticas de tono**, subordinadas a esos VALORS.
+>
+> **Reglas de jerarquía cuando hay conflicto:**
+> - Si una regla de este archivo entra en conflicto directo con `perfil-oscar.md` → gana `perfil-oscar.md`.
+> - Si una táctica B2B estándar (longitudes, hooks, CTAs) entra en conflicto directo con `perfil-oscar.md` → gana `perfil-oscar.md`.
+> - En tensión interpretable (no conflicto directo) → vale la táctica B2B / la regla de este archivo.
+>
+> **Principio operativo de la Carta Magna aplicado al copy:** el copy de Duendes diagnostica, no convence. Detecta sistemas ineficientes y propone evolución estructural. No mendiga atención. Habla desde autoridad técnica en IA, no desde pretendido expertise sectorial.
+
+---
+
 # Voz y tono de Duendes / Oscar Grana
 
 ## Para qué sirve este documento

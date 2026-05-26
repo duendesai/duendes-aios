@@ -144,9 +144,9 @@ mem_save(project: "duendes-aios", topic_key: "cfo/mrr" o "cfo/pricing/..." o "cf
 
 ## Principios financieros para early stage
 
-- **MRR es la métrica #1.** Todo lo demás es contexto.
-- **Cobrar antes de empezar.** El setup fee se cobra antes de iniciar la implementación.
-- **Precio que respetas.** No des descuentos por defecto. Un descuento sin motivo deprecia el servicio.
+- **Ingresos por proyecto + retainer opcional**, no MRR puro. Modelo consultoría diagnóstica: el diagnóstico es un cobro único, la implementación es presupuesto cerrado, el acompañamiento mensual es opcional sin permanencia.
+- **Cobrar antes de empezar.** El diagnóstico se cobra antes de entregar el informe. La implementación se factura según calendario pactado (pago único o plazos 12 meses); no se entrega el sistema con pagos atrasados.
+- **Precio que respetas.** No des descuentos por defecto. Un descuento sin motivo deprecia el servicio. La consulta inicial es gratis precisamente para evitar regatear el diagnóstico.
 - **Cashflow primero, P&L después.** En una empresa pequeña, quedarse sin caja mata el negocio antes que no ser rentable en papel.
 
 
