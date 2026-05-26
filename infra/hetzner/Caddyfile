@@ -1,0 +1,18 @@
+# /opt/n8n-recepcionista/Caddyfile en el VPS Hetzner.
+# Caddy gestiona SSL automático con Let's Encrypt para cada dominio.
+
+n8n.duendes.net {
+    reverse_proxy n8n:5678 {
+        flush_interval -1
+    }
+}
+
+api.duendes.net {
+    # CORS — el frontend en teams.duendes.net llama aquí.
+    # El FastAPI ya tiene CORS configurado, pero dejamos algunos headers básicos.
+    encode gzip
+
+    reverse_proxy teams-api:8000 {
+        flush_interval -1
+    }
+}

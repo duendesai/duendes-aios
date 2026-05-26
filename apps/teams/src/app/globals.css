@@ -1,0 +1,102 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Paleta brand Duendes (duendes.net) */
+    --brand-cream: 49 25% 93%;       /* #f2f1eb */
+    --brand-dark: 60 2% 17%;         /* #2d2d2c */
+    --brand-purple: 271 91% 65%;     /* #a855f7 */
+    --brand-purple-dark: 271 81% 56%; /* #9333ea */
+    --brand-fuchsia: 292 84% 61%;    /* #d946ef */
+    --brand-yellow: 47 99% 50%;      /* #fac802 */
+    --brand-yellow-hover: 45 100% 44%; /* #e0b400 */
+
+    /* Tokens semánticos para la app interna (claro, denso, utilitario) */
+    --background: 49 25% 95%;        /* cream un punto más claro para densidad */
+    --foreground: 60 2% 14%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 60 2% 14%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 60 2% 14%;
+
+    --primary: 271 91% 58%;          /* brand-purple un punto más profundo para UI */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 49 20% 89%;         /* hover sutil sobre cream */
+    --secondary-foreground: 60 2% 17%;
+
+    --muted: 49 18% 90%;
+    --muted-foreground: 60 2% 40%;
+
+    --accent: 49 25% 88%;
+    --accent-foreground: 60 2% 14%;
+
+    --destructive: 0 75% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 71% 35%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 60 2% 14%;
+
+    --border: 60 2% 17% / 0.08;      /* brand-dark/10 */
+    --border-strong: 60 2% 17% / 0.15;
+    --input: 0 0% 100%;
+    --ring: 271 91% 58%;
+
+    --radius: 0.75rem;               /* más generoso, alineado con la web */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-weight: 300;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Display = Zilla Slab para titulares */
+  .font-display {
+    font-family: var(--font-display), Georgia, serif;
+  }
+
+  /* Tag de sección (igual que duendes-web) */
+  .tag-label {
+    @apply text-xs font-bold uppercase tracking-widest;
+  }
+
+  /* Scrollbar fina y discreta */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--brand-dark) / 0.15);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--brand-dark) / 0.3);
+  }
+}
+
+/* Sombra estándar para cards (más suave que la default de shadcn) */
+.shadow-card {
+  box-shadow: 0 1px 2px hsl(60 2% 17% / 0.04), 0 4px 12px hsl(60 2% 17% / 0.04);
+}

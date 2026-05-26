@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
 
-from routers import chat, dashboard, projects, tasks, documents, agents, search
+from routers import chat, dashboard, projects, tasks, documents, agents, search, calls
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("aios-api")
@@ -25,7 +25,12 @@ app = FastAPI(title="AIOS API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://*.vercel.app"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",  # apps/teams (power dialer)
+        "https://teams.duendes.net",
+    ],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -44,3 +49,4 @@ app.include_router(tasks.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")
 app.include_router(agents.router, prefix="/api")
 app.include_router(search.router, prefix="/api")
+app.include_router(calls.router, prefix="/api")

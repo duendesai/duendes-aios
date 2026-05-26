@@ -1,0 +1,103 @@
+# /opt/n8n-recepcionista/docker-compose.yml en el VPS Hetzner.
+#
+# Stack original (n8n + postgres + caddy) + nuevo servicio teams-api (FastAPI).
+# Caddy hace SSL automático Let's Encrypt para n8n.duendes.net y api.duendes.net.
+
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    restart: always
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=n8n.duendes.net
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - WEBHOOK_URL=https://n8n.duendes.net/
+      - N8N_EDITOR_BASE_URL=https://n8n.duendes.net/
+      - GENERIC_TIMEZONE=Europe/Madrid
+      - TZ=Europe/Madrid
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=n8n
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD:-n8n_secure_password_change_me}
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=168
+      - N8N_METRICS=true
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - n8n-network
+
+  postgres:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=n8n
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-n8n_secure_password_change_me}
+      - POSTGRES_DB=n8n
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U n8n"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - n8n-network
+
+  # ─── teams.duendes.net API (power dialer SDR) ──────────────────────────────
+  teams-api:
+    build:
+      context: ./teams-api
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - AIRTABLE_API_KEY=${AIRTABLE_API_KEY}
+      - CALCOM_API_KEY=${CALCOM_API_KEY}
+      - CALCOM_EVENT_TYPE_ID=${CALCOM_EVENT_TYPE_ID:-5693752}
+      - ZADARMA_API_KEY=${ZADARMA_API_KEY}
+      - ZADARMA_API_SECRET=${ZADARMA_API_SECRET}
+      - ZADARMA_SIP_USERNAME=${ZADARMA_SIP_USERNAME:-34936942094}
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}
+      - TZ=Europe/Madrid
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - n8n-network
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - n8n
+      - teams-api
+    networks:
+      - n8n-network
+
+volumes:
+  n8n_data:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  n8n-network:
+    driver: bridge
