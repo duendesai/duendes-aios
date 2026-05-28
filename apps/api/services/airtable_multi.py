@@ -23,7 +23,45 @@ BASE_CRM = "appFIn3ntFb39vGXF"  # Duendes CRM
 # Tablas
 TABLE_MALAGA = "malaga"
 TABLE_CALLS = "Calls"
+TABLE_EMAILS = "Emails"
 TABLE_LEADS = "Leads"
+
+# Alias semántico: la tabla física `malaga` es ahora la tabla ÚNICA de prospectos
+# multi-campaña, filtrada por el campo {Campaña}. Mantiene el nombre "malaga" en
+# Airtable para no romper los enlaces (Emails.Prospect, Calls.Prospect) existentes.
+TABLE_PROSPECTOS = TABLE_MALAGA
+
+# Campañas del power dialer. `label` = valor EXACTO del campo {Campaña} en la
+# tabla de prospectos. `smartlead_id` = ID de campaña en Smartlead para el sync.
+# `import_source` (opcional): de dónde se importan los prospectos a medida que
+# reciben email. Sin él, la campaña no se auto-importa (sus prospectos ya viven
+# en la tabla del dialer, p.ej. fisios).
+CAMPAIGNS: dict[str, dict[str, Any]] = {
+    "fisios-malaga": {
+        "label": "Fisios Málaga",
+        "smartlead_id": 3368353,
+    },
+    "despachos-madrid": {
+        "label": "Despachos Madrid",
+        "smartlead_id": 3404016,
+        "import_source": {
+            # Base "duendes OUTREACH" (cold-outreach CrewAI) → tabla Leads.
+            "base_id": "apptD14jq6NCq5qIM",
+            "table": "Leads",
+            # Record de la campaña en la tabla Campaigns (para filtrar los leads).
+            "campaign_record": "rechQQIXSdUML1AsQ",
+        },
+    },
+}
+DEFAULT_CAMPAIGN = "fisios-malaga"
+
+
+def campaign_label(slug: str | None) -> str | None:
+    """Resuelve el slug de campaña (p.ej. 'despachos-madrid') a su label Airtable."""
+    if not slug:
+        return None
+    cfg = CAMPAIGNS.get(slug)
+    return cfg["label"] if cfg else None
 
 
 class AirtableError(Exception):
@@ -122,16 +160,33 @@ class AirtableMultiClient:
         return await self._request("GET", url)
 
     async def create_record(
-        self, base_id: str, table: str, fields: dict[str, Any]
+        self,
+        base_id: str,
+        table: str,
+        fields: dict[str, Any],
+        *,
+        typecast: bool = False,
     ) -> dict[str, Any]:
         url = self._url(base_id, table)
-        return await self._request("POST", url, json={"fields": _clean_fields(fields)})
+        body: dict[str, Any] = {"fields": _clean_fields(fields)}
+        if typecast:
+            body["typecast"] = True
+        return await self._request("POST", url, json=body)
 
     async def update_record(
-        self, base_id: str, table: str, record_id: str, fields: dict[str, Any]
+        self,
+        base_id: str,
+        table: str,
+        record_id: str,
+        fields: dict[str, Any],
+        *,
+        typecast: bool = False,
     ) -> dict[str, Any]:
         url = f"{self._url(base_id, table)}/{record_id}"
-        return await self._request("PATCH", url, json={"fields": _clean_fields(fields)})
+        body: dict[str, Any] = {"fields": _clean_fields(fields)}
+        if typecast:
+            body["typecast"] = True
+        return await self._request("PATCH", url, json=body)
 
 
 def _clean_fields(fields: dict[str, Any]) -> dict[str, Any]:

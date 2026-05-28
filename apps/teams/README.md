@@ -13,7 +13,7 @@ Webapp Next.js que vive en `apps/teams/` y sirve como dashboard de operaciones d
 - Supabase SSR para auth (magic link)
 - Backend: `apps/api/` (FastAPI) — router `/calls`
 - Telefonía: extensión Chrome **Zadarma Click to Call** (intercepta `tel:` URIs)
-- Booking: Cal.com v2 (event `5693752` · 30min · `cal.com/duendes/demo`)
+- Booking: Cal.com v2 (event `4879655` · 30min · `cal.com/duendes/consulta`)
 - Datos: Airtable directo (sin n8n)
   - `app5WbiXR0qXGTc3r` (LUCIA Bienestar) → `malaga` (cola) + `Calls` (log)
   - `appFIn3ntFb39vGXF` (Duendes CRM) → `Leads` (cuando se agenda demo)
@@ -41,7 +41,7 @@ Variables del backend (en `.env` raíz — ya configuradas):
 ```
 AIRTABLE_API_KEY=...
 CALCOM_API_KEY=cal_live_b5477a8c642374d0b66f621857f2624d
-CALCOM_EVENT_TYPE_ID=5693752
+CALCOM_EVENT_TYPE_ID=4879655
 ```
 
 ## Setup de la extensión Chrome Zadarma
@@ -179,7 +179,7 @@ Endpoints registrados en `routers/calls.py` bajo prefijo `/api/calls`:
 | GET | `/queue` | Cola de prospectos (filtros + sort canónico) |
 | GET | `/prospect/{id}` | Detalle + últimas 3 llamadas |
 | POST | `/result` | Log en Calls + PATCH en malaga (Intentos++, Estado, append Notas) |
-| GET | `/calcom/slots?days=N` | Slots disponibles del event 5693752 |
+| GET | `/calcom/slots?days=N` | Slots disponibles del event 4879655 |
 | POST | `/calcom/book` | Booking Cal.com + lead CRM + actualiza malaga |
 
 CORS añade `http://localhost:3001` y `https://teams.duendes.net`.

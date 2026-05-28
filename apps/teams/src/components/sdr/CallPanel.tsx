@@ -13,6 +13,14 @@ import {
   Calendar as CalIcon,
   Sparkle,
   Loader2,
+  Mail,
+  ChevronDown,
+  Eye,
+  MousePointerClick,
+  Reply,
+  XCircle,
+  Search,
+  ExternalLink,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -22,7 +30,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn, normalizePhoneEs } from '@/lib/utils'
 import { useCallSessionStore } from '@/store/useCallSessionStore'
 import { dialProspect, ApiError } from '@/lib/sdr/api'
-import type { DatosEnriquecidos } from '@/lib/sdr/types'
+import type { DatosEnriquecidos, EmailItem, EmailStatus, Prospect } from '@/lib/sdr/types'
 
 function fmtDuration(sec: number): string {
   const m = Math.floor(sec / 60)
@@ -179,6 +187,9 @@ export function CallPanel() {
             </div>
           </div>
 
+          {/* Investiga antes de llamar — quick links */}
+          <QuickLinks prospect={prospect} />
+
           {/* Status + intentos */}
           <Card className="p-5 grid grid-cols-2 gap-5 text-sm">
             <Field label="Estado">
@@ -222,6 +233,11 @@ export function CallPanel() {
               </Field>
             )}
           </Card>
+
+          {/* Emails enviados */}
+          {prospect.emails && prospect.emails.length > 0 && (
+            <EmailsCard emails={prospect.emails} />
+          )}
 
           {/* Notas previas */}
           {prospect.notas && (
@@ -431,5 +447,262 @@ function EnrichedDataCard({
   )
 }
 
+function EmailsCard({ emails }: { emails: EmailItem[] }) {
+  const [openId, setOpenId] = useState<string | null>(emails[0]?.id ?? null)
+
+  const latest = emails[0]
+  const daysAgo = latest?.fecha_envio
+    ? Math.floor(
+        (Date.now() - new Date(latest.fecha_envio).getTime()) / 86400000
+      )
+    : null
+
+  return (
+    <Card className="p-5 border-brand-yellow/40 bg-brand-yellow/[0.06]">
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <Mail className="h-3.5 w-3.5 text-brand-yellow-hover" />
+          <p className="tag-label text-brand-yellow-hover">
+            {emails.length === 1
+              ? 'Email enviado'
+              : `${emails.length} emails enviados`}
+          </p>
+        </div>
+        {daysAgo !== null && (
+          <Badge
+            variant={daysAgo >= 2 && daysAgo <= 5 ? 'cta' : 'secondary'}
+            className="text-[10px]"
+          >
+            D+{daysAgo} {daysAgo >= 2 && daysAgo <= 5 ? '· sweet spot' : ''}
+          </Badge>
+        )}
+      </div>
+
+      <p className="text-xs text-muted-foreground mb-3">
+        Empieza la llamada con{' '}
+        <span className="text-brand-dark font-semibold">
+          “Te mandé un correo hace {daysAgo} {daysAgo === 1 ? 'día' : 'días'}{' '}
+          sobre…”
+        </span>{' '}
+        — el prospecto lo reconoce.
+      </p>
+
+      <ul className="space-y-2">
+        {emails.map((email) => {
+          const isOpen = openId === email.id
+          return (
+            <li
+              key={email.id}
+              className="rounded-xl border border-border bg-card overflow-hidden"
+            >
+              <button
+                onClick={() => setOpenId(isOpen ? null : email.id)}
+                className={cn(
+                  'w-full text-left p-3 flex items-center gap-3 transition-colors',
+                  emailRowBg(email.status)
+                )}
+              >
+                <EmailStatusIcon status={email.status} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                    <EmailStatusBadge status={email.status} />
+                    {email.fecha_envio && (
+                      <span className="text-[11px] text-muted-foreground">
+                        {formatFecha(email.fecha_envio)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-sm font-semibold text-brand-dark truncate">
+                    {email.asunto || '(sin asunto)'}
+                  </div>
+                  {email.destino && (
+                    <div className="text-[11px] text-muted-foreground truncate">
+                      → {email.destino}
+                    </div>
+                  )}
+                </div>
+                <ChevronDown
+                  className={cn(
+                    'h-4 w-4 text-muted-foreground transition-transform',
+                    isOpen && 'rotate-180'
+                  )}
+                />
+              </button>
+              {isOpen && (email.respuesta || email.cuerpo) && (
+                <div className="border-t border-border bg-brand-cream/40 p-4 space-y-3">
+                  {email.respuesta && (
+                    <div className="rounded-lg border border-success/40 bg-success/[0.08] p-3">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <Reply className="h-3.5 w-3.5 text-success" />
+                        <span className="text-[10px] uppercase tracking-wider font-bold text-success">
+                          Respondió
+                          {email.fecha_respuesta
+                            ? ` · ${formatFecha(email.fecha_respuesta)}`
+                            : ''}
+                        </span>
+                      </div>
+                      <pre className="text-xs whitespace-pre-wrap font-sans text-brand-dark leading-relaxed">
+                        {email.respuesta}
+                      </pre>
+                    </div>
+                  )}
+                  {email.cuerpo && (
+                    <div>
+                      {email.respuesta && (
+                        <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1">
+                          Email que le enviamos
+                        </p>
+                      )}
+                      <pre className="text-xs whitespace-pre-wrap font-sans text-brand-dark/90 leading-relaxed">
+                        {email.cuerpo}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+    </Card>
+  )
+}
+
+function EmailStatusBadge({ status }: { status: EmailStatus }) {
+  const map: Record<EmailStatus, { label: string; cls: string }> = {
+    sent: { label: 'Enviado · sin abrir', cls: 'bg-brand-dark/10 text-brand-dark/70' },
+    opened: { label: 'Abierto ✓', cls: 'bg-brand-yellow/30 text-brand-dark border border-brand-yellow' },
+    clicked: { label: 'Click en enlace', cls: 'bg-brand-purple/20 text-brand-purple-dark border border-brand-purple/40' },
+    replied: { label: 'RESPONDIÓ', cls: 'bg-success/20 text-success border border-success/40 font-bold' },
+    bounced: { label: 'Rebotado', cls: 'bg-destructive/15 text-destructive border border-destructive/40' },
+    unsubscribed: { label: 'Unsubscribed', cls: 'bg-destructive/15 text-destructive border border-destructive/40' },
+  }
+  const cfg = map[status] || map.sent
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center px-2 py-0.5 rounded-md text-[10px] uppercase tracking-wider font-bold',
+        cfg.cls
+      )}
+    >
+      {cfg.label}
+    </span>
+  )
+}
+
+function emailRowBg(status: EmailStatus): string {
+  switch (status) {
+    case 'replied':
+      return 'bg-success/[0.06] hover:bg-success/10'
+    case 'opened':
+    case 'clicked':
+      return 'bg-brand-yellow/[0.08] hover:bg-brand-yellow/15'
+    case 'bounced':
+    case 'unsubscribed':
+      return 'bg-destructive/[0.04] hover:bg-destructive/10'
+    default:
+      return 'hover:bg-accent'
+  }
+}
+
+function EmailStatusIcon({ status }: { status: EmailStatus }) {
+  const cls = 'h-4 w-4 shrink-0'
+  switch (status) {
+    case 'replied':
+      return <Reply className={cn(cls, 'text-success')} />
+    case 'clicked':
+      return <MousePointerClick className={cn(cls, 'text-brand-purple')} />
+    case 'opened':
+      return <Eye className={cn(cls, 'text-brand-yellow-hover')} />
+    case 'bounced':
+    case 'unsubscribed':
+      return <XCircle className={cn(cls, 'text-destructive')} />
+    case 'sent':
+    default:
+      return <Mail className={cn(cls, 'text-muted-foreground')} />
+  }
+}
+
+function formatFecha(iso: string): string {
+  try {
+    const d = new Date(iso)
+    return d.toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Europe/Madrid',
+    })
+  } catch {
+    return iso
+  }
+}
+
 // re-export para futuras integraciones
 export const callStateClass = cn
+
+// ─── QuickLinks: investiga el negocio antes de descolgar ──────────────────────
+function QuickLinks({ prospect }: { prospect: Prospect }) {
+  const websiteUrl = prospect.website
+    ? prospect.website.startsWith('http')
+      ? prospect.website
+      : `https://${prospect.website}`
+    : null
+
+  // Para Maps y Google: query con título + ciudad (siempre funciona)
+  const searchQuery = encodeURIComponent(
+    [prospect.title, prospect.city].filter(Boolean).join(' ')
+  )
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${searchQuery}`
+  const googleUrl = `https://www.google.com/search?q=${searchQuery}`
+
+  const links = [
+    websiteUrl && {
+      href: websiteUrl,
+      label: 'Web',
+      sub: websiteUrl
+        .replace(/^https?:\/\//, '')
+        .replace(/\/$/, '')
+        .slice(0, 32),
+      icon: Globe,
+    },
+    {
+      href: mapsUrl,
+      label: 'Google Maps',
+      sub: prospect.city || 'Buscar dirección',
+      icon: MapPin,
+    },
+    {
+      href: googleUrl,
+      label: 'Buscar en Google',
+      sub: 'Reseñas, redes, contexto',
+      icon: Search,
+    },
+  ].filter(Boolean) as { href: string; label: string; sub: string; icon: typeof Globe }[]
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {links.map((l) => {
+        const Icon = l.icon
+        return (
+          <a
+            key={l.label}
+            href={l.href}
+            target="_blank"
+            rel="noreferrer"
+            className="group flex items-center gap-2.5 px-3 py-2 rounded-xl border border-border-strong bg-card hover:border-brand-purple hover:bg-brand-purple/5 transition-all"
+          >
+            <Icon className="h-4 w-4 text-brand-purple-dark shrink-0" />
+            <div className="text-left leading-tight">
+              <div className="text-xs font-semibold text-brand-dark">{l.label}</div>
+              <div className="text-[10px] text-muted-foreground truncate max-w-[180px]">
+                {l.sub}
+              </div>
+            </div>
+            <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity ml-1" />
+          </a>
+        )
+      })}
+    </div>
+  )
+}

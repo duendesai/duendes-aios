@@ -1,7 +1,7 @@
 """
 CalcomService — wrapper async sobre Cal.com API v2.
 
-Event Type ID por defecto: 5693752 (cal.com/duendes/demo, "Demo Gratuita", 30 min).
+Event Type ID por defecto: 4879655 (cal.com/duendes/consulta, "Demo Gratuita", 30 min).
 """
 from __future__ import annotations
 

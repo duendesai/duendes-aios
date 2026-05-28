@@ -1,6 +1,6 @@
 'use client'
 
-import { RefreshCw, MapPin, Inbox } from 'lucide-react'
+import { RefreshCw, MapPin, Inbox, Mail } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -109,6 +109,24 @@ export function CallQueue({ onReload }: CallQueueProps) {
                         <span className="truncate">{p.city || 'Sin ciudad'}</span>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
+                        {p.last_email && p.last_email.days_ago !== null && (
+                          <span
+                            className={cn(
+                              'inline-flex items-center gap-0.5 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded',
+                              p.last_email.status === 'replied'
+                                ? 'bg-success/20 text-success'
+                                : p.last_email.status === 'opened' || p.last_email.status === 'clicked'
+                                ? 'bg-brand-yellow/30 text-brand-dark'
+                                : p.last_email.status === 'bounced' || p.last_email.status === 'unsubscribed'
+                                ? 'bg-destructive/15 text-destructive'
+                                : 'bg-muted text-muted-foreground'
+                            )}
+                            title={`Email enviado hace ${p.last_email.days_ago}d · ${p.last_email.status}`}
+                          >
+                            <Mail className="h-3 w-3" />
+                            D+{p.last_email.days_ago}
+                          </span>
+                        )}
                         {p.intentos > 0 && (
                           <span className="font-mono text-[10px]" title="Intentos">
                             ×{p.intentos}

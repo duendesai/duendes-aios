@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import calls
+from routers import calls, admin
 
 logging.basicConfig(
     level=logging.INFO,
@@ -56,3 +56,4 @@ async def health() -> dict[str, str]:
 
 
 app.include_router(calls.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")

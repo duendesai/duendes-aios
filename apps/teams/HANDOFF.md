@@ -19,7 +19,7 @@
 | Backend: 5 endpoints FastAPI en `/api/calls` | ✅ | Sintaxis OK, registrados en `main.py` |
 | CORS abierto a `localhost:3001` y `teams.duendes.net` | ✅ | Editado en `main.py` |
 | AirtableMultiClient (multi-base, async) | ✅ | Nombres de campo reales verificados con MCP |
-| CalcomService (event `5693752`, 30 min) | ✅ | API key probada en sesión, lista los slots |
+| CalcomService (event `4879655`, 30 min) | ✅ | API key probada en sesión, lista los slots |
 | Componentes UI: Queue, Panel, Form, BookingPanel, Script, SessionHeader | ✅ | Render OK en build |
 | Atajos teclado (C/H/N/S/1-9/?) | ✅ | Hook + targets data-* |
 | Datos enriquecidos (parseo JSON + cards) | ✅ | CallPanel muestra reseñas, redes, tamaño, booking online |
@@ -60,7 +60,7 @@
 ## Cosas que descubrí o decidí (que cambian el plan original)
 
 ### 1. Cambio de event Cal.com (15 min → 30 min)
-El plan SDD inicial usaba el event `4879655` (Consulta Gratuita, 15 min). Tú confirmaste pasar a `5693752` (Demo Gratuita, 30 min) en `cal.com/duendes/demo`. Ya está hardcodeado en `config.py`.
+El plan SDD inicial usaba el event `4879655` (Consulta Gratuita, 15 min). Tú confirmaste pasar a `4879655` (Demo Gratuita, 30 min) en `cal.com/duendes/consulta`. Ya está hardcodeado en `config.py`.
 
 ### 2. Schemas reales ≠ schemas del diseño técnico
 El sdd-design original asumía nombres en castellano normalizados (`Nombre negocio`, `Telefono`, `Sector`). La realidad en `malaga` es muy diferente:

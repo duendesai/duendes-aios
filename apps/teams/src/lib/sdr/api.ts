@@ -13,6 +13,7 @@ import type {
   Booking,
   BookingPayload,
   CallResultPayload,
+  CampaignsResponse,
   Prospect,
   QueueResponse,
   Slot,
@@ -77,12 +78,29 @@ export class ApiError extends Error {
   }
 }
 
-export async function fetchQueue(maxRecords = 50): Promise<QueueResponse> {
-  return request<QueueResponse>(`/calls/queue?max_records=${maxRecords}`)
+export type QueueMode = 'warm' | 'cold' | 'all'
+
+export async function fetchQueue(
+  maxRecords = 50,
+  mode: QueueMode = 'all',
+  campaign?: string | null
+): Promise<QueueResponse> {
+  const params = new URLSearchParams({ max_records: String(maxRecords), mode })
+  if (campaign) params.set('campaign', campaign)
+  return request<QueueResponse>(`/calls/queue?${params.toString()}`)
 }
 
-export async function fetchAgenda(daysAhead = 14): Promise<AgendaResponse> {
-  return request<AgendaResponse>(`/calls/agenda?days_ahead=${daysAhead}`)
+export async function fetchCampaigns(): Promise<CampaignsResponse> {
+  return request<CampaignsResponse>('/calls/campaigns')
+}
+
+export async function fetchAgenda(
+  daysAhead = 14,
+  campaign?: string | null
+): Promise<AgendaResponse> {
+  const params = new URLSearchParams({ days_ahead: String(daysAhead) })
+  if (campaign) params.set('campaign', campaign)
+  return request<AgendaResponse>(`/calls/agenda?${params.toString()}`)
 }
 
 export async function fetchProspect(id: string): Promise<Prospect> {

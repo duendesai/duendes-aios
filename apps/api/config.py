@@ -11,10 +11,12 @@ class Settings(BaseSettings):
     # Cold outreach / SDR (teams.duendes.net — power dialer)
     airtable_api_key: str = ""
     calcom_api_key: str = ""
-    calcom_event_type_id: int = 5693752  # cal.com/duendes/demo (30 min)
+    calcom_event_type_id: int = 4879655  # cal.com/duendes/consulta (30 min)
     zadarma_api_key: str = ""
     zadarma_api_secret: str = ""
     zadarma_sip_username: str = ""
+    smartlead_api_key: str = ""
+    admin_token: str = ""  # Auth para endpoints /admin/* — n8n lo manda en X-Admin-Token
 
     class Config:
         env_file = "../../.env"

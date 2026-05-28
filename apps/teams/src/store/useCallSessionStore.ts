@@ -1,9 +1,24 @@
 'use client'
 
 import { create } from 'zustand'
-import type { Prospect } from '@/lib/sdr/types'
+import type { Campaign, Prospect } from '@/lib/sdr/types'
+import type { QueueMode } from '@/lib/sdr/api'
 
 export type CallState = 'idle' | 'in_call' | 'wrap_up'
+
+const QUEUE_MODE_STORAGE_KEY = 'teams-sdr-queue-mode'
+const QUEUE_CAMPAIGN_STORAGE_KEY = 'teams-sdr-campaign'
+
+function loadInitialMode(): QueueMode {
+  if (typeof window === 'undefined') return 'all'
+  const saved = window.localStorage.getItem(QUEUE_MODE_STORAGE_KEY) as QueueMode | null
+  return saved === 'warm' || saved === 'cold' || saved === 'all' ? saved : 'all'
+}
+
+function loadInitialCampaign(): string {
+  if (typeof window === 'undefined') return 'fisios-malaga'
+  return window.localStorage.getItem(QUEUE_CAMPAIGN_STORAGE_KEY) || 'fisios-malaga'
+}
 
 interface SessionStats {
   called: number
@@ -19,6 +34,9 @@ interface CallSessionState {
   activeId: string | null
   loadingQueue: boolean
   queueError: string | null
+  mode: QueueMode
+  campaign: string
+  campaigns: Campaign[]
 
   // Active prospect detail (con call_history)
   activeProspect: Prospect | null
@@ -40,6 +58,9 @@ interface CallSessionState {
   // Actions
   setQueue: (prospects: Prospect[]) => void
   setQueueLoading: (loading: boolean, error?: string | null) => void
+  setMode: (m: QueueMode) => void
+  setCampaign: (c: string) => void
+  setCampaigns: (campaigns: Campaign[]) => void
   selectProspect: (id: string) => void
   setActiveProspect: (p: Prospect | null) => void
   setProspectLoading: (loading: boolean) => void
@@ -63,6 +84,9 @@ export const useCallSessionStore = create<CallSessionState>((set, get) => ({
   activeId: null,
   loadingQueue: true,
   queueError: null,
+  mode: loadInitialMode(),
+  campaign: loadInitialCampaign(),
+  campaigns: [],
 
   activeProspect: null,
   loadingProspect: false,
@@ -90,6 +114,22 @@ export const useCallSessionStore = create<CallSessionState>((set, get) => ({
     })),
 
   setQueueLoading: (loading, error = null) => set({ loadingQueue: loading, queueError: error }),
+
+  setMode: (m) => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(QUEUE_MODE_STORAGE_KEY, m)
+    }
+    set({ mode: m })
+  },
+
+  setCampaign: (c) => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(QUEUE_CAMPAIGN_STORAGE_KEY, c)
+    }
+    set({ campaign: c })
+  },
+
+  setCampaigns: (campaigns) => set({ campaigns }),
 
   selectProspect: (id) =>
     set({

@@ -1,9 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Clock, PhoneCall, PhoneOff, Calendar, RotateCcw, Phone } from 'lucide-react'
+import { Clock, PhoneCall, PhoneOff, Calendar, RotateCcw, Phone, Mail, Snowflake, Layers } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { useCallSessionStore } from '@/store/useCallSessionStore'
+import type { QueueMode } from '@/lib/sdr/api'
+import type { Campaign } from '@/lib/sdr/types'
 
 function fmtElapsed(ms: number): string {
   const total = Math.floor(ms / 1000)
@@ -17,10 +20,28 @@ function fmtElapsed(ms: number): string {
 interface SessionHeaderProps {
   totalQueue: number
   onReset: () => void
+  onModeChange: (m: QueueMode) => void
+  campaigns: Campaign[]
+  activeCampaign: string
+  onCampaignChange: (slug: string) => void
 }
 
-export function SessionHeader({ totalQueue, onReset }: SessionHeaderProps) {
+const MODES: { value: QueueMode; label: string; icon: typeof Mail; hint: string }[] = [
+  { value: 'warm', label: 'Calientes', icon: Mail, hint: 'Solo los que ya recibieron email' },
+  { value: 'cold', label: 'Cold call', icon: Snowflake, hint: 'Sin email programado — llamada en frío pura' },
+  { value: 'all', label: 'Todos', icon: Layers, hint: 'Mezcla — excluye los que esperan email' },
+]
+
+export function SessionHeader({
+  totalQueue,
+  onReset,
+  onModeChange,
+  campaigns,
+  activeCampaign,
+  onCampaignChange,
+}: SessionHeaderProps) {
   const stats = useCallSessionStore((s) => s.stats)
+  const mode = useCallSessionStore((s) => s.mode)
   const sessionStartedAt = useCallSessionStore((s) => s.sessionStartedAt)
   const conversion = useCallSessionStore((s) => s.getConversionRate())
 
@@ -31,8 +52,49 @@ export function SessionHeader({ totalQueue, onReset }: SessionHeaderProps) {
   }, [sessionStartedAt])
 
   return (
-    <header className="h-16 shrink-0 border-b border-border px-6 flex items-center justify-between bg-card">
-      <div className="flex items-center gap-8">
+    <header className="h-16 shrink-0 border-b border-border px-6 flex items-center justify-between bg-card gap-6">
+      {/* Selector de campaña */}
+      {campaigns.length > 0 && (
+        <div className="flex items-center gap-2 shrink-0">
+          <select
+            value={activeCampaign}
+            onChange={(e) => onCampaignChange(e.target.value)}
+            className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-brand-dark focus:outline-none focus:ring-2 focus:ring-brand-purple/40 cursor-pointer"
+            title="Cambiar de campaña"
+          >
+            {campaigns.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label} ({c.count})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Toggle de modos — primera cosa que ves */}
+      <div className="flex items-center gap-1 p-1 rounded-xl bg-muted border border-border shrink-0">
+        {MODES.map(({ value, label, icon: Icon, hint }) => {
+          const active = mode === value
+          return (
+            <button
+              key={value}
+              onClick={() => onModeChange(value)}
+              title={hint}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
+                active
+                  ? 'bg-brand-purple text-white shadow-sm'
+                  : 'text-brand-dark/60 hover:text-brand-dark'
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="flex items-center gap-8 flex-1">
         <div>
           <p className="tag-label text-brand-purple-dark">Sesión SDR</p>
           <div className="font-display font-bold text-brand-dark text-base leading-tight mt-0.5">

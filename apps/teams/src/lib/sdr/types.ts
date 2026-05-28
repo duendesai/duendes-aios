@@ -91,6 +91,9 @@ export interface Prospect {
   datos_enriquecidos: DatosEnriquecidos | null
   crm_url: string | null
   call_history?: CallHistoryItem[]
+  emails?: EmailItem[]
+  last_email?: LastEmailSummary | null
+  email_count?: number
 }
 
 export interface CallHistoryItem {
@@ -100,6 +103,35 @@ export interface CallHistoryItem {
   buying_signal: string | null
   notas: string | null
   duracion_seg: number | null
+}
+
+export type EmailStatus =
+  | 'sent'
+  | 'opened'
+  | 'clicked'
+  | 'replied'
+  | 'bounced'
+  | 'unsubscribed'
+
+export interface EmailItem {
+  id: string
+  email_id: string | null
+  fecha_envio: string | null
+  destino: string | null
+  asunto: string | null
+  cuerpo: string | null
+  status: EmailStatus
+  fecha_apertura: string | null
+  fecha_respuesta: string | null
+  respuesta: string | null
+  campaign: string | null
+}
+
+export interface LastEmailSummary {
+  asunto: string | null
+  fecha_envio: string | null
+  status: EmailStatus
+  days_ago: number | null
 }
 
 export interface CallResultPayload {
@@ -148,6 +180,18 @@ export interface Booking {
 export interface QueueResponse {
   prospects: Prospect[]
   total: number
+  mode?: 'warm' | 'cold' | 'all'
+  campaign?: string | null
+}
+
+export interface Campaign {
+  id: string // slug, p.ej. 'despachos-madrid'
+  label: string // nombre visible, p.ej. 'Despachos Madrid'
+  count: number // prospectos activos (con teléfono, no excluidos)
+}
+
+export interface CampaignsResponse {
+  campaigns: Campaign[]
 }
 
 export interface AgendaProspect extends Prospect {

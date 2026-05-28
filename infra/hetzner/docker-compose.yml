@@ -26,6 +26,10 @@ services:
       - EXECUTIONS_DATA_PRUNE=true
       - EXECUTIONS_DATA_MAX_AGE=168
       - N8N_METRICS=true
+      # Permitir que los workflows lean estas vars vía {{ $env.* }}
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - AIRTABLE_API_KEY=${AIRTABLE_API_KEY}
+      - ADMIN_TOKEN=${ADMIN_TOKEN}
     volumes:
       - n8n_data:/home/node/.n8n
     depends_on:
@@ -60,12 +64,14 @@ services:
     environment:
       - AIRTABLE_API_KEY=${AIRTABLE_API_KEY}
       - CALCOM_API_KEY=${CALCOM_API_KEY}
-      - CALCOM_EVENT_TYPE_ID=${CALCOM_EVENT_TYPE_ID:-5693752}
+      - CALCOM_EVENT_TYPE_ID=${CALCOM_EVENT_TYPE_ID:-4879655}
       - ZADARMA_API_KEY=${ZADARMA_API_KEY}
       - ZADARMA_API_SECRET=${ZADARMA_API_SECRET}
       - ZADARMA_SIP_USERNAME=${ZADARMA_SIP_USERNAME:-34936942094}
       - SUPABASE_URL=${SUPABASE_URL:-}
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}
+      - SMARTLEAD_API_KEY=${SMARTLEAD_API_KEY}
+      - ADMIN_TOKEN=${ADMIN_TOKEN}
       - TZ=Europe/Madrid
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]

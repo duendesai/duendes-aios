@@ -25,6 +25,7 @@ from services.zadarma_service import ZadarmaError, ZadarmaService
 from services.calls_service import (
     NEGATIVE_DISPOSITIONS,
     book_demo_and_create_lead,
+    count_campaigns,
     fetch_agenda,
     fetch_prospect_detail,
     fetch_queue,
@@ -113,26 +114,57 @@ class DialIn(BaseModel):
 @router.get("/queue")
 async def get_queue(
     max_records: int = Query(50, le=200),
+    mode: str = Query("all", regex="^(warm|cold|all)$"),
+    campaign: Optional[str] = Query(None),
     air: AirtableMultiClient = Depends(get_airtable),
 ) -> dict[str, Any]:
-    """Cola de prospectos pendientes de llamar."""
+    """
+    Cola de prospectos pendientes de llamar.
+
+    Modos:
+    - `warm`: solo prospectos con ≥1 email enviado (post-email, calientes).
+    - `cold`: solo prospectos sin `Email contacto` (cold call puro, sin email programado).
+    - `all` (default): mezcla — excluye los "reservados" (email contacto pero sin envío todavía).
+
+    `campaign` (slug, opcional): filtra por campaña (p.ej. `despachos-madrid`). Sin él, todas.
+    """
     try:
-        prospects = await fetch_queue(air, max_records=max_records)
+        prospects = await fetch_queue(
+            air, max_records=max_records, mode=mode, campaign=campaign
+        )
     except AirtableError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
-    return {"prospects": prospects, "total": len(prospects)}
+    return {
+        "prospects": prospects,
+        "total": len(prospects),
+        "mode": mode,
+        "campaign": campaign,
+    }
 
 
 @router.get("/agenda")
 async def get_agenda(
     days_ahead: int = Query(14, ge=1, le=60),
+    campaign: Optional[str] = Query(None),
     air: AirtableMultiClient = Depends(get_airtable),
 ) -> dict[str, Any]:
     """Callbacks programados (Estado=Rellamar) categorizados por urgencia."""
     try:
-        return await fetch_agenda(air, days_ahead=days_ahead)
+        return await fetch_agenda(air, days_ahead=days_ahead, campaign=campaign)
     except AirtableError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
+
+
+@router.get("/campaigns")
+async def get_campaigns(
+    air: AirtableMultiClient = Depends(get_airtable),
+) -> dict[str, Any]:
+    """Campañas disponibles para el selector del dialer, con conteo de prospectos activos."""
+    try:
+        campaigns = await count_campaigns(air)
+    except AirtableError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return {"campaigns": campaigns}
 
 
 @router.get("/prospect/{prospect_id}")

@@ -37,9 +37,11 @@ tmp/
 temp/
 *.tmp
 
-# Next.js
-apps/web/.next/
-apps/web/node_modules/
+# Node / pnpm / Next.js (cualquier nivel del monorepo)
+node_modules/
+.next/
+.pnpm-store/
+.turbo/
 
 # Claude Code local config
 .claude/

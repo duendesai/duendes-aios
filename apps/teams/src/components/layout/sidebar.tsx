@@ -7,6 +7,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   Phone,
   CalendarClock,
+  UserCircle,
   LogOut,
   ChevronsLeft,
   ChevronsRight,
@@ -31,6 +32,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { href: '/sdr', label: 'Llamadas', icon: Phone, tag: 'SDR' },
   { href: '/agenda', label: 'Agenda', icon: CalendarClock },
+  { href: '/cuenta', label: 'Cuenta', icon: UserCircle },
 ]
 
 const STORAGE_KEY = 'teams-sidebar-collapsed'

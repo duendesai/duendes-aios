@@ -12,7 +12,7 @@ import { SessionHeader } from '@/components/sdr/SessionHeader'
 import { ShortcutsHelp } from '@/components/sdr/ShortcutsHelp'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useCallSessionStore } from '@/store/useCallSessionStore'
-import { fetchQueue, fetchProspect, ApiError } from '@/lib/sdr/api'
+import { fetchQueue, fetchProspect, fetchCampaigns, ApiError, type QueueMode } from '@/lib/sdr/api'
 import { useKeyboardShortcuts } from '@/lib/sdr/useKeyboardShortcuts'
 import { DISPOSITION_OPTIONS } from '@/lib/sdr/enums'
 
@@ -21,6 +21,12 @@ export default function SdrPage() {
   const requestedProspect = searchParams.get('prospect')
   const setQueue = useCallSessionStore((s) => s.setQueue)
   const setQueueLoading = useCallSessionStore((s) => s.setQueueLoading)
+  const mode = useCallSessionStore((s) => s.mode)
+  const setMode = useCallSessionStore((s) => s.setMode)
+  const campaign = useCallSessionStore((s) => s.campaign)
+  const setCampaign = useCallSessionStore((s) => s.setCampaign)
+  const campaigns = useCallSessionStore((s) => s.campaigns)
+  const setCampaigns = useCallSessionStore((s) => s.setCampaigns)
   const selectProspect = useCallSessionStore((s) => s.selectProspect)
   const activeId = useCallSessionStore((s) => s.activeId)
   const setActiveProspect = useCallSessionStore((s) => s.setActiveProspect)
@@ -37,22 +43,47 @@ export default function SdrPage() {
   const [helpOpen, setHelpOpen] = useState(false)
 
   // Cargar cola
-  const loadQueue = useCallback(async () => {
-    setQueueLoading(true)
-    try {
-      const data = await fetchQueue(50)
-      setQueue(data.prospects)
-    } catch (err) {
-      const msg = err instanceof ApiError ? err.message : 'Error de red'
-      setQueueLoading(false, msg)
-      toast.error(`No se pudo cargar la cola: ${msg}`)
-    }
-  }, [setQueue, setQueueLoading])
+  const loadQueue = useCallback(
+    async (currentMode: QueueMode = mode, currentCampaign: string = campaign) => {
+      setQueueLoading(true)
+      try {
+        const data = await fetchQueue(100, currentMode, currentCampaign)
+        setQueue(data.prospects)
+      } catch (err) {
+        const msg = err instanceof ApiError ? err.message : 'Error de red'
+        setQueueLoading(false, msg)
+        toast.error(`No se pudo cargar la cola: ${msg}`)
+      }
+    },
+    [setQueue, setQueueLoading, mode, campaign]
+  )
 
+  // Cargar campañas disponibles al montar (alimenta el selector)
   useEffect(() => {
-    loadQueue()
+    fetchCampaigns()
+      .then((data) => setCampaigns(data.campaigns))
+      .catch(() => {
+        /* sin campañas → el selector se oculta */
+      })
+  }, [setCampaigns])
+
+  // Recarga cuando cambia el modo o la campaña
+  useEffect(() => {
+    loadQueue(mode, campaign)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [mode, campaign])
+
+  function handleModeChange(m: QueueMode) {
+    if (m === mode) return
+    setMode(m)
+    // El useEffect recarga la cola
+  }
+
+  function handleCampaignChange(slug: string) {
+    if (slug === campaign) return
+    setCampaign(slug)
+    // El useEffect recarga la cola
+  }
 
   // Si llegamos con ?prospect=ID (desde Agenda), forzar selección incluso si no
   // está en la cola (lo carga el efecto que carga el detalle igualmente)
@@ -138,7 +169,14 @@ export default function SdrPage() {
 
   return (
     <div className="h-full flex flex-col bg-background">
-      <SessionHeader totalQueue={prospectsTotal} onReset={resetSession} />
+      <SessionHeader
+        totalQueue={prospectsTotal}
+        onReset={resetSession}
+        onModeChange={handleModeChange}
+        campaigns={campaigns}
+        activeCampaign={campaign}
+        onCampaignChange={handleCampaignChange}
+      />
 
       <div className="flex-1 flex overflow-hidden">
         <CallQueue onReload={loadQueue} />

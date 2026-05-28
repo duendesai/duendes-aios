@@ -15,9 +15,12 @@ from services.airtable_multi import (
     AirtableMultiClient,
     BASE_CRM,
     BASE_LUCIA,
+    CAMPAIGNS,
     TABLE_CALLS,
+    TABLE_EMAILS,
     TABLE_LEADS,
     TABLE_MALAGA,
+    campaign_label,
 )
 from services.calcom_service import CalcomService
 
@@ -131,6 +134,7 @@ def _to_prospect_dto(record: dict[str, Any]) -> dict[str, Any]:
         "booking_online": bool(f.get("Booking online")),
         "datos_enriquecidos": _parse_datos_enriquecidos(f.get("Datos enriquecidos")),
         "crm_url": f.get("CRM Duendes URL"),
+        "campaign": f.get("Campaña"),
     }
 
 
@@ -146,35 +150,113 @@ def _to_call_history_item(record: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _to_email_dto(record: dict[str, Any]) -> dict[str, Any]:
+    f = record.get("fields", {})
+    return {
+        "id": record["id"],
+        "email_id": f.get("Email ID"),
+        "fecha_envio": f.get("Fecha envío"),
+        "destino": f.get("Email destino"),
+        "asunto": f.get("Asunto"),
+        "cuerpo": f.get("Cuerpo"),
+        "status": f.get("Status") or "sent",
+        "fecha_apertura": f.get("Fecha apertura"),
+        "fecha_respuesta": f.get("Fecha respuesta"),
+        "respuesta": f.get("Respuesta"),
+        "campaign": f.get("Campaign"),
+    }
+
+
+def _days_since(iso: str | None) -> int | None:
+    if not iso:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+        return (datetime.now(timezone.utc) - dt).days
+    except (ValueError, TypeError):
+        return None
+
+
+async def _fetch_emails_for_prospects(
+    air: AirtableMultiClient, prospect_ids: list[str]
+) -> dict[str, list[dict[str, Any]]]:
+    """
+    Carga todos los emails linkados a estos prospects. Devuelve dict {prospect_id: [emails...]}
+    ordenados por Fecha envío descendente (más reciente primero).
+
+    Nota: Airtable `ARRAYJOIN({Prospect})` devuelve los nombres (primary field),
+    NO los record IDs. Por eso no podemos filtrar server-side por prospect_id.
+    Cargamos todos los emails y filtramos en Python (la tabla es pequeña).
+    """
+    if not prospect_ids:
+        return {}
+
+    wanted = set(prospect_ids)
+    out: dict[str, list[dict[str, Any]]] = {pid: [] for pid in prospect_ids}
+
+    try:
+        records = await air.list_records(
+            BASE_LUCIA,
+            TABLE_EMAILS,
+            sort=[{"field": "Fecha envío", "direction": "desc"}],
+            max_records=1000,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Fallo cargando emails: %s", exc)
+        return out
+
+    for r in records:
+        linked = r.get("fields", {}).get("Prospect") or []
+        # El campo Prospect es array de record IDs (strings tipo "rec...")
+        for pid in linked:
+            if pid in wanted:
+                out[pid].append(_to_email_dto(r))
+    return out
+
+
 # ─── Casos de uso ──────────────────────────────────────────────────────────────
 
 
-async def fetch_queue(air: AirtableMultiClient, max_records: int = 50) -> list[dict[str, Any]]:
+async def fetch_queue(
+    air: AirtableMultiClient,
+    max_records: int = 200,
+    mode: str = "all",
+    campaign: str | None = None,
+) -> list[dict[str, Any]]:
     """
     Lista prospectos elegibles para llamar.
-    Filtros aplicados:
+
+    Filtros base (siempre):
     - `phone` no vacío
     - `No llamar` = false
     - `Estado` no en lista de finales
+    - Si `Estado=Rellamar` y `Próximo intento > now`, excluir
+
+    Modo `mode` filtra ADEMÁS:
+    - `warm`: solo los que tienen ≥1 email enviado. Sort por D+2..D+5 primero.
+    - `cold`: solo los que NO tienen `Email contacto` (= no en ninguna campaña Smartlead). Sort por Score desc.
+    - `all`: warm + cold (excluye los "reservados": con Email contacto pero sin envío todavía). Sort: warm primero.
+
+    El motivo de excluir "reservados" en `all`: si Smartlead va a mandarles el email
+    en los próximos días, llamarles AHORA los quemaría — el email llegará después.
     """
     excluded = ", ".join(f'{{Estado}}="{e}"' for e in EXCLUDED_FROM_QUEUE)
-    filter_formula = (
-        f"AND("
-        f"  {{phone}}!='',"
-        f"  NOT({{No llamar}}),"
-        f"  NOT(OR({excluded}))"
-        f")"
-    )
-    sort = [
-        {"field": "Prioridad", "direction": "asc"},
-        {"field": "Intentos", "direction": "asc"},
-    ]
+    clauses = ["{phone}!=''", "NOT({No llamar})", f"NOT(OR({excluded}))"]
+    label = campaign_label(campaign)
+    if label:
+        clauses.append(f'{{Campaña}}="{label}"')
+    filter_formula = "AND(" + ", ".join(clauses) + ")"
+    # No limitamos por max_records aquí — filtramos en Python primero por modo
+    # y devolvemos solo el top max_records al final.
     records = await air.list_records(
         BASE_LUCIA,
         TABLE_MALAGA,
         filter_formula=filter_formula,
-        sort=sort,
-        max_records=max_records,
+        sort=[
+            {"field": "Prioridad", "direction": "asc"},
+            {"field": "Intentos", "direction": "asc"},
+        ],
+        max_records=500,
     )
 
     # Post-filtro: si Estado=Rellamar y Próximo intento > ahora, excluir
@@ -193,11 +275,113 @@ async def fetch_queue(air: AirtableMultiClient, max_records: int = 50) -> list[d
                 pass
         eligible.append(r)
 
-    return [_to_prospect_dto(r) for r in eligible]
+    # Cargar emails linkados
+    prospect_ids = [r["id"] for r in eligible]
+    emails_by_prospect = await _fetch_emails_for_prospects(air, prospect_ids)
+
+    # Construir DTOs con last_email
+    dtos: list[dict[str, Any]] = []
+    for r in eligible:
+        dto = _to_prospect_dto(r)
+        emails = emails_by_prospect.get(r["id"], [])
+        f = r.get("fields", {})
+        has_email_contacto = bool(f.get("Email contacto"))
+
+        if emails:
+            last = emails[0]
+            days = _days_since(last.get("fecha_envio"))
+            dto["last_email"] = {
+                "asunto": last.get("asunto"),
+                "fecha_envio": last.get("fecha_envio"),
+                "status": last.get("status"),
+                "days_ago": days,
+            }
+            dto["email_count"] = len(emails)
+        else:
+            dto["last_email"] = None
+            dto["email_count"] = 0
+
+        dto["has_email_contacto"] = has_email_contacto
+        dtos.append(dto)
+
+    # Filtro por modo
+    mode = (mode or "all").lower()
+    if mode == "warm":
+        filtered = [p for p in dtos if p["email_count"] > 0]
+    elif mode == "cold":
+        filtered = [p for p in dtos if not p["has_email_contacto"]]
+    else:  # 'all'
+        # Excluir "reservados": con email contacto pero sin email enviado todavía
+        filtered = [
+            p for p in dtos
+            if p["email_count"] > 0 or not p["has_email_contacto"]
+        ]
+
+    # Sort distinto por modo
+    if mode == "cold":
+        # Score desc (los más cualificados primero), después Intentos asc
+        filtered.sort(
+            key=lambda p: (
+                -(p.get("score") or 0),
+                p.get("intentos", 0),
+            )
+        )
+    elif mode == "warm":
+        # Sweet spot D+2..D+5 primero
+        filtered.sort(key=_warm_sort_key)
+    else:  # 'all'
+        # Sweet spot primero, después por score
+        filtered.sort(key=_warm_sort_key)
+
+    return filtered[:max_records]
+
+
+def _warm_sort_key(p: dict[str, Any]) -> tuple:
+    """Sort: D+2..D+5 primero, después D+6..D+14, después muy reciente, después sin email."""
+    le = p.get("last_email")
+    if le and le.get("days_ago") is not None:
+        d = le["days_ago"]
+        if 2 <= d <= 5:
+            return (0, d, -(p.get("score") or 0))
+        if 6 <= d <= 14:
+            return (1, d, -(p.get("score") or 0))
+        if d < 2:
+            return (3, d, -(p.get("score") or 0))
+        return (2, d, -(p.get("score") or 0))
+    return (4, p.get("intentos", 0), -(p.get("score") or 0))
+
+
+async def count_campaigns(air: AirtableMultiClient) -> list[dict[str, Any]]:
+    """Campañas disponibles + nº de prospectos activos (con phone, no excluidos).
+
+    Alimenta el selector de campañas del frontend.
+    """
+    excluded = ", ".join(f'{{Estado}}="{e}"' for e in EXCLUDED_FROM_QUEUE)
+    out: list[dict[str, Any]] = []
+    for slug, cfg in CAMPAIGNS.items():
+        label = cfg["label"]
+        filt = (
+            f'AND({{Campaña}}="{label}", {{phone}}!=\'\', '
+            f"NOT({{No llamar}}), NOT(OR({excluded})))"
+        )
+        try:
+            recs = await air.list_records(
+                BASE_LUCIA,
+                TABLE_MALAGA,
+                filter_formula=filt,
+                fields=["title"],
+                max_records=1000,
+            )
+            count = len(recs)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Conteo campaña %s falló: %s", slug, exc)
+            count = 0
+        out.append({"id": slug, "label": label, "count": count})
+    return out
 
 
 async def fetch_agenda(
-    air: AirtableMultiClient, days_ahead: int = 14
+    air: AirtableMultiClient, days_ahead: int = 14, campaign: str | None = None
 ) -> dict[str, Any]:
     """
     Devuelve todos los prospectos con callback programado (Estado=Rellamar y
@@ -211,12 +395,11 @@ async def fetch_agenda(
     """
     from datetime import date
 
-    filter_formula = (
-        "AND("
-        "  {Estado}='Rellamar',"
-        "  {Próximo intento}!=''"
-        ")"
-    )
+    clauses = ["{Estado}='Rellamar'", "{Próximo intento}!=''"]
+    label = campaign_label(campaign)
+    if label:
+        clauses.append(f'{{Campaña}}="{label}"')
+    filter_formula = "AND(" + ", ".join(clauses) + ")"
     sort = [{"field": "Próximo intento", "direction": "asc"}]
     records = await air.list_records(
         BASE_LUCIA,
@@ -280,11 +463,11 @@ async def fetch_agenda(
 async def fetch_prospect_detail(
     air: AirtableMultiClient, prospect_id: str
 ) -> dict[str, Any]:
-    """Detalle de un prospecto + últimas 3 llamadas vinculadas."""
+    """Detalle de un prospecto + últimas 3 llamadas + emails enviados."""
     record = await air.get_record(BASE_LUCIA, TABLE_MALAGA, prospect_id)
     dto = _to_prospect_dto(record)
 
-    # Historial
+    # Historial de llamadas
     try:
         calls_filter = f"FIND('{prospect_id}', ARRAYJOIN({{Prospect}})) > 0"
         history = await air.list_records(
@@ -298,6 +481,28 @@ async def fetch_prospect_detail(
     except Exception as exc:  # noqa: BLE001
         logger.warning("Fallo al cargar call_history para %s: %s", prospect_id, exc)
         dto["call_history"] = []
+
+    # Historial de emails (toda la secuencia)
+    try:
+        emails_by = await _fetch_emails_for_prospects(air, [prospect_id])
+        emails = emails_by.get(prospect_id, [])
+        dto["emails"] = emails  # ordenados desc (más reciente primero)
+        if emails:
+            last = emails[0]
+            dto["last_email"] = {
+                "asunto": last.get("asunto"),
+                "fecha_envio": last.get("fecha_envio"),
+                "status": last.get("status"),
+                "days_ago": _days_since(last.get("fecha_envio")),
+            }
+        else:
+            dto["last_email"] = None
+        dto["email_count"] = len(emails)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Fallo al cargar emails para %s: %s", prospect_id, exc)
+        dto["emails"] = []
+        dto["last_email"] = None
+        dto["email_count"] = 0
 
     return dto
 
