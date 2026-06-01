@@ -21,6 +21,8 @@ import {
   XCircle,
   Search,
   ExternalLink,
+  Copy,
+  Download,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -29,8 +31,14 @@ import { Card } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn, normalizePhoneEs } from '@/lib/utils'
 import { useCallSessionStore } from '@/store/useCallSessionStore'
-import { dialProspect, ApiError } from '@/lib/sdr/api'
-import type { DatosEnriquecidos, EmailItem, EmailStatus, Prospect } from '@/lib/sdr/types'
+import { dialProspect, analyzeCall, ApiError } from '@/lib/sdr/api'
+import type {
+  AnalyzeResult,
+  DatosEnriquecidos,
+  EmailItem,
+  EmailStatus,
+  Prospect,
+} from '@/lib/sdr/types'
 
 function fmtDuration(sec: number): string {
   const m = Math.floor(sec / 60)
@@ -94,17 +102,37 @@ export function CallPanel() {
     if (!normalizedPhone || !prospect) return
     setDialing(true)
     try {
-      await dialProspect({ prospect_id: prospect.id, phone: normalizedPhone })
+      // Modelo callback API (probado, funciona).
+      // El widget WebRTC outbound directo está bloqueado por la PBX
+      // (envía INVITE → FAIL inmediato). En cambio el callback API hace:
+      //   1) backend → POST /v1/request/callback/
+      //   2) Zadarma llama PRIMERO a la extensión 100 (suena en el widget)
+      //   3) cuando contestas, Zadarma marca al destino y une las dos patas
+      //   4) la conversación queda grabada en la nube + visible en /v1/statistics/pbx/
+      // Pre-requisito: la extensión 100 NO debe tener desvío externo activo
+      // (si está activo, la pata entrante se la come ElevenLabs y nunca suena
+      // en el widget).
+      await dialProspect({
+        prospect_id: prospect.id,
+        phone: normalizedPhone,
+      })
+
       toast.success(
         <span>
-          Tu teléfono Zadarma sonará en breve, descuélgalo. <strong>Cuando termines pulsa H o Esc.</strong>
+          Llamada iniciada. Acepta la llamada entrante en el widget.{' '}
+          <strong>Pulsa H o Esc para colgar.</strong>
         </span>,
-        { duration: 6000 }
+        { duration: 5000 }
       )
       startCall()
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : 'Error desconocido'
-      toast.error(`Zadarma no pudo iniciar la llamada: ${msg}`)
+      const msg =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+          ? err.message
+          : 'Error desconocido'
+      toast.error(`No pude iniciar la llamada: ${msg}`)
     } finally {
       setDialing(false)
     }
@@ -302,6 +330,9 @@ export function CallPanel() {
               </ul>
             </Card>
           )}
+
+          {/* Análisis IA de la llamada (grabación → transcripción → resumen + email) */}
+          <CallAnalysisCard prospect={prospect} />
 
           {loadingProspect && (
             <div className="text-xs text-muted-foreground text-center">
@@ -704,5 +735,129 @@ function QuickLinks({ prospect }: { prospect: Prospect }) {
         )
       })}
     </div>
+  )
+}
+
+// ─── Análisis IA de la llamada: grabación → transcripción → resumen + email ──
+function CallAnalysisCard({ prospect }: { prospect: Prospect }) {
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<AnalyzeResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const lastCall = prospect.call_history?.[0]
+
+  async function handleAnalyze() {
+    if (!prospect.phone) return
+    setLoading(true)
+    setError(null)
+    try {
+      const r = await analyzeCall({
+        prospect_id: prospect.id,
+        phone: prospect.phone,
+        prospect_name: prospect.title,
+        disposition: lastCall?.disposition ?? undefined,
+        call_record_id: lastCall?.id,
+      })
+      setResult(r)
+      if (!r.ok) setError(r.reason || 'No se encontró la grabación de la llamada')
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Error al analizar la llamada')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const a = result?.analysis
+
+  return (
+    <Card className="p-5 border-brand-purple/30 bg-brand-purple/[0.04]">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          <Sparkle className="h-3.5 w-3.5 text-brand-purple-dark" />
+          <p className="tag-label text-brand-purple-dark">Análisis de la llamada</p>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1.5"
+          onClick={handleAnalyze}
+          disabled={loading || !prospect.phone}
+        >
+          {loading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Sparkle className="h-4 w-4" />
+          )}
+          {loading ? 'Analizando…' : 'Analizar'}
+        </Button>
+      </div>
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
+
+      {a && (
+        <div className="space-y-3 text-sm">
+          {result?.recording_url && (
+            <a
+              href={result.recording_url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs text-brand-purple-dark hover:underline"
+            >
+              <Download className="h-3.5 w-3.5" /> Descargar audio
+              {result.seconds ? ` (${fmtDuration(result.seconds)})` : ''}
+            </a>
+          )}
+          {a.resumen && (
+            <div>
+              <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1">
+                Resumen
+              </p>
+              <p className="text-brand-dark/90">{a.resumen}</p>
+            </div>
+          )}
+          {a.proximos_pasos.length > 0 && (
+            <div>
+              <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1">
+                Próximos pasos
+              </p>
+              <ul className="list-disc pl-4 space-y-0.5 text-brand-dark/90">
+                {a.proximos_pasos.map((p, i) => (
+                  <li key={i}>{p}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {a.necesita_email && a.email_cuerpo && (
+            <div className="rounded-lg border border-brand-yellow/40 bg-brand-yellow/[0.06] p-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] uppercase tracking-wider font-bold text-brand-yellow-hover">
+                  Email sugerido
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-2 gap-1"
+                  onClick={() =>
+                    navigator.clipboard.writeText(
+                      `${a.email_asunto}\n\n${a.email_cuerpo}`
+                    )
+                  }
+                >
+                  <Copy className="h-3 w-3" /> Copiar
+                </Button>
+              </div>
+              {a.email_asunto && (
+                <p className="text-xs font-semibold text-brand-dark mb-1">
+                  {a.email_asunto}
+                </p>
+              )}
+              <p className="text-xs whitespace-pre-wrap text-brand-dark/85 leading-relaxed">
+                {a.email_cuerpo}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
   )
 }

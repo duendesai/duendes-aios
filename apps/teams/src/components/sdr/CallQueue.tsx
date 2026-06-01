@@ -33,7 +33,7 @@ export function CallQueue({ onReload }: CallQueueProps) {
   const selectProspect = useCallSessionStore((s) => s.selectProspect)
 
   return (
-    <div className="w-72 shrink-0 border-r border-border bg-card flex flex-col h-full">
+    <div className="w-80 shrink-0 border-r border-border bg-card flex flex-col h-full">
       <div className="h-14 px-4 border-b border-border flex items-center justify-between">
         <div>
           <p className="tag-label text-brand-purple-dark">Cola</p>
@@ -98,10 +98,10 @@ export function CallQueue({ onReload }: CallQueueProps) {
                     )}
                   >
                     <div className="flex items-start justify-between gap-2 mb-1.5">
-                      <div className="font-semibold text-sm text-brand-dark truncate flex-1 leading-tight">
+                      <div className="font-semibold text-sm text-brand-dark line-clamp-2 flex-1 leading-tight">
                         {p.title}
                       </div>
-                      <Badge variant={badge.variant}>{badge.label}</Badge>
+                      <Badge variant={badge.variant} className="shrink-0">{badge.label}</Badge>
                     </div>
                     <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                       <div className="flex items-center gap-1 truncate">

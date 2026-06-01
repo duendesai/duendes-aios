@@ -90,6 +90,11 @@ EXCLUDED_FROM_QUEUE = [
     "No interesa ahora",
 ]
 
+# Status del último email que cuentan como "ya abrieron" (clicked y replied
+# implican apertura previa). bounced/unsubscribed no llegan a la cola: el sync
+# Smartlead los marca como No llamar.
+OPENED_STATUSES = {"opened", "clicked", "replied"}
+
 
 # ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -295,6 +300,8 @@ async def fetch_queue(
                 "fecha_envio": last.get("fecha_envio"),
                 "status": last.get("status"),
                 "days_ago": days,
+                "fecha_apertura": last.get("fecha_apertura"),
+                "fecha_respuesta": last.get("fecha_respuesta"),
             }
             dto["email_count"] = len(emails)
         else:
@@ -305,12 +312,26 @@ async def fetch_queue(
         dtos.append(dto)
 
     # Filtro por modo
-    mode = (mode or "all").lower()
-    if mode == "warm":
-        filtered = [p for p in dtos if p["email_count"] > 0]
+    mode = (mode or "warm_opened").lower()
+    if mode == "warm_opened":
+        # Calientes que YA abrieron (o clickaron / respondieron)
+        filtered = [
+            p for p in dtos
+            if p["email_count"] > 0
+            and ((p.get("last_email") or {}).get("status") or "sent") in OPENED_STATUSES
+        ]
+    elif mode == "warm_not_opened":
+        # Reserva: email enviado pero sin abrir todavía
+        filtered = [
+            p for p in dtos
+            if p["email_count"] > 0
+            and ((p.get("last_email") or {}).get("status") or "sent") == "sent"
+        ]
     elif mode == "cold":
         filtered = [p for p in dtos if not p["has_email_contacto"]]
-    else:  # 'all'
+    elif mode == "warm":  # compat clientes antiguos
+        filtered = [p for p in dtos if p["email_count"] > 0]
+    else:  # 'all' compat
         # Excluir "reservados": con email contacto pero sin email enviado todavía
         filtered = [
             p for p in dtos
@@ -318,7 +339,13 @@ async def fetch_queue(
         ]
 
     # Sort distinto por modo
-    if mode == "cold":
+    if mode == "warm_opened":
+        # Apertura más antigua primero (la curiosidad se enfría)
+        filtered.sort(key=_opened_sort_key)
+    elif mode == "warm_not_opened":
+        # Envío más antiguo primero (reserva, coherente con abiertos)
+        filtered.sort(key=_sent_sort_key)
+    elif mode == "cold":
         # Score desc (los más cualificados primero), después Intentos asc
         filtered.sort(
             key=lambda p: (
@@ -326,11 +353,7 @@ async def fetch_queue(
                 p.get("intentos", 0),
             )
         )
-    elif mode == "warm":
-        # Sweet spot D+2..D+5 primero
-        filtered.sort(key=_warm_sort_key)
-    else:  # 'all'
-        # Sweet spot primero, después por score
+    else:  # 'warm' / 'all' compat → sweet spot D+2..D+5 primero
         filtered.sort(key=_warm_sort_key)
 
     return filtered[:max_records]
@@ -349,6 +372,30 @@ def _warm_sort_key(p: dict[str, Any]) -> tuple:
             return (3, d, -(p.get("score") or 0))
         return (2, d, -(p.get("score") or 0))
     return (4, p.get("intentos", 0), -(p.get("score") or 0))
+
+
+def _opened_sort_key(p: dict[str, Any]) -> tuple:
+    """Sort para warm_opened: fecha de apertura ASC (más antigua primero).
+
+    La curiosidad de un abierto se enfría; conviene atacar antes a los que
+    abrieron hace más tiempo. Fallback a fecha_respuesta o fecha_envio si
+    Smartlead no proporcionó la fecha exacta de apertura.
+    """
+    le = p.get("last_email") or {}
+    fecha = (
+        le.get("fecha_apertura")
+        or le.get("fecha_respuesta")
+        or le.get("fecha_envio")
+        or ""
+    )
+    return (0 if fecha else 1, fecha)
+
+
+def _sent_sort_key(p: dict[str, Any]) -> tuple:
+    """Sort para warm_not_opened: fecha de envío ASC (más antiguo primero)."""
+    le = p.get("last_email") or {}
+    fecha = le.get("fecha_envio") or ""
+    return (0 if fecha else 1, fecha)
 
 
 async def count_campaigns(air: AirtableMultiClient) -> list[dict[str, Any]]:

@@ -30,6 +30,8 @@ VARS=(
   ZADARMA_SIP_USERNAME
   SUPABASE_URL
   SUPABASE_ANON_KEY
+  SMARTLEAD_API_KEY
+  ADMIN_TOKEN
 )
 
 # Construir bloque con las vars leídas del .env local (sin imprimirlas)

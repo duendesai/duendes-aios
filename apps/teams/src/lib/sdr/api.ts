@@ -10,6 +10,7 @@
 import { createClient } from '@/lib/supabase/client'
 import type {
   AgendaResponse,
+  AnalyzeResult,
   Booking,
   BookingPayload,
   CallResultPayload,
@@ -78,11 +79,11 @@ export class ApiError extends Error {
   }
 }
 
-export type QueueMode = 'warm' | 'cold' | 'all'
+export type QueueMode = 'warm_opened' | 'warm_not_opened' | 'cold'
 
 export async function fetchQueue(
   maxRecords = 50,
-  mode: QueueMode = 'all',
+  mode: QueueMode = 'warm_opened',
   campaign?: string | null
 ): Promise<QueueResponse> {
   const params = new URLSearchParams({ max_records: String(maxRecords), mode })
@@ -134,6 +135,23 @@ export async function dialProspect(payload: {
   phone: string
 }): Promise<{ ok: boolean; zadarma: Record<string, unknown> }> {
   return request('/calls/zadarma/dial', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function fetchWebrtcKey(): Promise<{ status: string; key: string }> {
+  return request('/calls/webrtc/key')
+}
+
+export async function analyzeCall(payload: {
+  prospect_id: string
+  phone: string
+  prospect_name?: string
+  disposition?: string
+  call_record_id?: string
+}): Promise<AnalyzeResult> {
+  return request('/calls/analyze', {
     method: 'POST',
     body: JSON.stringify(payload),
   })

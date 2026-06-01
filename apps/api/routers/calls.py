@@ -18,10 +18,17 @@ from typing import Any, Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, EmailStr, Field
 
+from config import get_settings
 from deps import get_airtable, get_calcom, get_zadarma
-from services.airtable_multi import AirtableError, AirtableMultiClient
+from services.airtable_multi import (
+    BASE_LUCIA,
+    TABLE_CALLS,
+    AirtableError,
+    AirtableMultiClient,
+)
 from services.calcom_service import CalcomError, CalcomService
 from services.zadarma_service import ZadarmaError, ZadarmaService
+from services.call_analysis import CallAnalysisError, analyze_call
 from services.calls_service import (
     NEGATIVE_DISPOSITIONS,
     book_demo_and_create_lead,
@@ -108,13 +115,24 @@ class DialIn(BaseModel):
     phone: str  # número en formato internacional (con o sin +)
 
 
+class AnalyzeIn(BaseModel):
+    prospect_id: str
+    phone: str
+    prospect_name: Optional[str] = ""
+    disposition: Optional[str] = ""
+    call_record_id: Optional[str] = None  # registro Calls donde persistir el análisis
+
+
 # ─── Endpoints ─────────────────────────────────────────────────────────────────
 
 
 @router.get("/queue")
 async def get_queue(
     max_records: int = Query(50, le=200),
-    mode: str = Query("all", regex="^(warm|cold|all)$"),
+    mode: str = Query(
+        "warm_opened",
+        regex="^(warm_opened|warm_not_opened|cold|warm|all)$",
+    ),
     campaign: Optional[str] = Query(None),
     air: AirtableMultiClient = Depends(get_airtable),
 ) -> dict[str, Any]:
@@ -122,9 +140,12 @@ async def get_queue(
     Cola de prospectos pendientes de llamar.
 
     Modos:
-    - `warm`: solo prospectos con ≥1 email enviado (post-email, calientes).
-    - `cold`: solo prospectos sin `Email contacto` (cold call puro, sin email programado).
-    - `all` (default): mezcla — excluye los "reservados" (email contacto pero sin envío todavía).
+    - `warm_opened` (default): YA abrieron el email (opened/clicked/replied).
+      Sort: apertura más antigua primero (la curiosidad se enfría).
+    - `warm_not_opened`: email enviado pero sin abrir. Reserva, cuando se
+      acaben los abiertos. Sort: envío más antiguo primero.
+    - `cold`: sin `Email contacto` (cold call puro, no van por Smartlead).
+    - `warm` / `all`: legacy, compat con clientes antiguos.
 
     `campaign` (slug, opcional): filtra por campaña (p.ej. `despachos-madrid`). Sin él, todas.
     """
@@ -241,3 +262,93 @@ async def post_dial(
     except ZadarmaError as exc:
         raise HTTPException(status_code=502, detail=f"Zadarma: {exc}")
     return {"ok": True, "zadarma": result}
+
+
+@router.get("/zadarma/diagnose")
+async def get_zadarma_diagnose(
+    zadarma: ZadarmaService = Depends(get_zadarma),
+) -> dict[str, Any]:
+    """
+    Diagnóstico end-to-end del estado Zadarma desde el backend.
+
+    Útil para verificar SIN ESPECULAR:
+    - Saldo actual
+    - Estado online/offline de las extensiones PBX (100, 101)
+    - Lista de usuarios WebRTC y dominios autorizados
+    - Líneas SIP planas
+    - Desvíos configurados a nivel PBX
+    """
+    return await zadarma.diagnose()
+
+
+@router.get("/webrtc/key")
+async def get_webrtc_key(
+    sip: Optional[str] = Query(default=None),
+    zadarma: ZadarmaService = Depends(get_zadarma),
+) -> dict[str, Any]:
+    """
+    Devuelve la clave temporal Zadarma que el frontend usa para inicializar el
+    widget WebRTC embebido en el dialer.
+
+    Sin `sip`, usa el SIP configurado del backend (ZADARMA_SIP_USERNAME),
+    que en producción debería ser la extensión PBX (`561989-100`) para que las
+    llamadas se graben y aparezcan en /v1/statistics/pbx/.
+    """
+    try:
+        result = await zadarma.get_webrtc_key(sip)
+    except ZadarmaError as exc:
+        raise HTTPException(status_code=502, detail=f"Zadarma: {exc}")
+    return result
+
+
+def _format_analysis(a: dict[str, Any]) -> str:
+    parts: list[str] = []
+    if a.get("resumen"):
+        parts.append(f"RESUMEN:\n{a['resumen']}")
+    if a.get("puntos_clave"):
+        parts.append("PUNTOS CLAVE:\n- " + "\n- ".join(a["puntos_clave"]))
+    if a.get("proximos_pasos"):
+        parts.append("PRÓXIMOS PASOS:\n- " + "\n- ".join(a["proximos_pasos"]))
+    if a.get("necesita_email") and a.get("email_cuerpo"):
+        parts.append(
+            f"EMAIL SUGERIDO:\nAsunto: {a.get('email_asunto', '')}\n\n{a['email_cuerpo']}"
+        )
+    return "\n\n".join(parts)
+
+
+@router.post("/analyze")
+async def post_analyze(
+    payload: AnalyzeIn,
+    air: AirtableMultiClient = Depends(get_airtable),
+    zadarma: ZadarmaService = Depends(get_zadarma),
+) -> dict[str, Any]:
+    """Analiza la última llamada a un número: grabación → transcripción → resumen + email."""
+    settings = get_settings()
+    try:
+        result = await analyze_call(
+            zadarma=zadarma,
+            groq_api_key=settings.groq_api_key,
+            to_number=payload.phone,
+            prospect_name=payload.prospect_name or "",
+            disposition=payload.disposition or "",
+        )
+    except CallAnalysisError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    except ZadarmaError as exc:
+        raise HTTPException(status_code=502, detail=f"Zadarma: {exc}")
+
+    if result.get("ok") and payload.call_record_id:
+        try:
+            await air.update_record(
+                BASE_LUCIA,
+                TABLE_CALLS,
+                payload.call_record_id,
+                {
+                    "Transcripcion": result.get("transcript", ""),
+                    "Análisis IA": _format_analysis(result.get("analysis", {})),
+                },
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("No se pudo guardar el análisis en Calls: %s", exc)
+
+    return result

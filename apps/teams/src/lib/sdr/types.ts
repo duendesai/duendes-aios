@@ -190,6 +190,24 @@ export interface Campaign {
   count: number // prospectos activos (con teléfono, no excluidos)
 }
 
+export interface CallAnalysis {
+  resumen: string
+  puntos_clave: string[]
+  proximos_pasos: string[]
+  necesita_email: boolean
+  email_asunto: string
+  email_cuerpo: string
+}
+
+export interface AnalyzeResult {
+  ok: boolean
+  reason?: string
+  recording_url?: string
+  seconds?: number
+  transcript?: string
+  analysis?: CallAnalysis
+}
+
 export interface CampaignsResponse {
   campaigns: Campaign[]
 }

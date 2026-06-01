@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Clock, PhoneCall, PhoneOff, Calendar, RotateCcw, Phone, Mail, Snowflake, Layers } from 'lucide-react'
+import { Clock, PhoneCall, PhoneOff, Calendar, RotateCcw, Phone, Mail, MailOpen, Snowflake } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useCallSessionStore } from '@/store/useCallSessionStore'
@@ -27,9 +27,24 @@ interface SessionHeaderProps {
 }
 
 const MODES: { value: QueueMode; label: string; icon: typeof Mail; hint: string }[] = [
-  { value: 'warm', label: 'Calientes', icon: Mail, hint: 'Solo los que ya recibieron email' },
-  { value: 'cold', label: 'Cold call', icon: Snowflake, hint: 'Sin email programado — llamada en frío pura' },
-  { value: 'all', label: 'Todos', icon: Layers, hint: 'Mezcla — excluye los que esperan email' },
+  {
+    value: 'warm_opened',
+    label: 'Abrieron',
+    icon: MailOpen,
+    hint: 'Recibieron y abrieron el email. Sort: apertura más antigua primero (la curiosidad se enfría).',
+  },
+  {
+    value: 'warm_not_opened',
+    label: 'Sin abrir',
+    icon: Mail,
+    hint: 'Recibieron el email pero aún no lo han abierto. Reserva para cuando se acaben los abiertos.',
+  },
+  {
+    value: 'cold',
+    label: 'Frías',
+    icon: Snowflake,
+    hint: 'Sin email programado — llamada en frío pura.',
+  },
 ]
 
 export function SessionHeader({
@@ -52,7 +67,7 @@ export function SessionHeader({
   }, [sessionStartedAt])
 
   return (
-    <header className="h-16 shrink-0 border-b border-border px-6 flex items-center justify-between bg-card gap-6">
+    <header className="h-20 shrink-0 border-b border-border px-6 flex items-center justify-between bg-card gap-6">
       {/* Selector de campaña */}
       {campaigns.length > 0 && (
         <div className="flex items-center gap-2 shrink-0">
@@ -137,11 +152,6 @@ export function SessionHeader({
       </div>
 
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2 text-sm">
-          <Phone className="h-4 w-4 text-brand-dark/40" />
-          <span className="font-bold text-brand-dark">{totalQueue}</span>
-          <span className="text-muted-foreground">en cola</span>
-        </div>
         <Button
           variant="ghost"
           size="sm"

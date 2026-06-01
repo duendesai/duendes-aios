@@ -12,7 +12,14 @@ import { SessionHeader } from '@/components/sdr/SessionHeader'
 import { ShortcutsHelp } from '@/components/sdr/ShortcutsHelp'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useCallSessionStore } from '@/store/useCallSessionStore'
-import { fetchQueue, fetchProspect, fetchCampaigns, ApiError, type QueueMode } from '@/lib/sdr/api'
+import {
+  fetchQueue,
+  fetchProspect,
+  fetchCampaigns,
+  fetchWebrtcKey,
+  ApiError,
+  type QueueMode,
+} from '@/lib/sdr/api'
 import { useKeyboardShortcuts } from '@/lib/sdr/useKeyboardShortcuts'
 import { DISPOSITION_OPTIONS } from '@/lib/sdr/enums'
 
@@ -66,6 +73,102 @@ export default function SdrPage() {
         /* sin campañas → el selector se oculta */
       })
   }, [setCampaigns])
+
+  // Cargar el widget WebRTC oficial de Zadarma — UNA sola vez por sesión.
+  // Esto registra la extensión PBX 561989-100 dentro del propio dialer:
+  //   ✔ Llamadas pasan por la PBX (grabación automática + aparecen en /v1/statistics/pbx/)
+  //   ✔ Callbacks del backend (POST /calls/zadarma/dial) suenan en el propio widget
+  //   ✔ Botón "Analizar" funciona porque encuentra la grabación
+  // El dominio teams.duendes.net está autorizado en my.zadarma.com → WebRTC.
+  //
+  // IMPORTANTE — Por qué SIP_LOGIN = '561989-100' (login COMPLETO):
+  // El widget WebRTC de Zadarma EXIGE el login SIP completo (pbxId-ext). Si le
+  // pasas solo '100' responde `integrationDisabled: wrong key or sip`. En cambio,
+  // el endpoint /v1/request/callback/ del backend exige `from` corto (regex
+  // `^(\+?[0-9]{7,15}|[0-9]{3,5})$` según OpenAPI oficial). Por eso el backend
+  // tiene ZADARMA_SIP_USERNAME='561989-100' Y el método callback() extrae solo
+  // '100' automáticamente antes de enviar — ver zadarma_service.py:callback().
+  useEffect(() => {
+    type WindowWithZadarma = Window & {
+      __zadarmaWidgetLoaded?: boolean
+      zadarmaWidgetFn?: (
+        key: string,
+        sip: string,
+        shape: 'square' | 'rounded',
+        lang: string,
+        expanded: boolean,
+        position: Record<string, string>
+      ) => void
+    }
+    const w = window as WindowWithZadarma
+    if (w.__zadarmaWidgetLoaded) return
+    w.__zadarmaWidgetLoaded = true
+
+    const SIP_LOGIN = '100'
+    const LIB =
+      'https://my.zadarma.com/webphoneWebRTCWidget/v9/js/loader-phone-lib.js?sub_v=1'
+    const FN =
+      'https://my.zadarma.com/webphoneWebRTCWidget/v9/js/loader-phone-fn.js?sub_v=1'
+
+    function loadScript(src: string): Promise<void> {
+      return new Promise((resolve, reject) => {
+        if (document.querySelector(`script[src="${src}"]`)) {
+          resolve()
+          return
+        }
+        const s = document.createElement('script')
+        s.src = src
+        s.async = true
+        s.onload = () => resolve()
+        s.onerror = () => reject(new Error(`No pude cargar ${src}`))
+        document.head.appendChild(s)
+      })
+    }
+
+    async function init() {
+      try {
+        const { key } = await fetchWebrtcKey()
+        await loadScript(LIB)
+        await loadScript(FN)
+        if (typeof w.zadarmaWidgetFn === 'function') {
+          w.zadarmaWidgetFn(
+            key,
+            SIP_LOGIN,
+            'square',
+            'es',
+            true,
+            { right: '10px', top: '5px' }
+          )
+          // Estilo del widget: transparentar la caja gris exterior, dejar
+          // visibles solo el input + botón verde (que tienen su propio fondo).
+          if (!document.getElementById('zdrm-widget-style')) {
+            const style = document.createElement('style')
+            style.id = 'zdrm-widget-style'
+            style.textContent = `
+              .zdrm-phone,
+              .zdrm-webphone-box {
+                background: transparent !important;
+                background-color: transparent !important;
+                box-shadow: none !important;
+                border: none !important;
+                padding: 0 !important;
+              }
+            `
+            document.head.appendChild(style)
+          }
+        } else {
+          throw new Error('zadarmaWidgetFn no expuesto tras cargar los scripts')
+        }
+      } catch (err) {
+        w.__zadarmaWidgetLoaded = false
+        // eslint-disable-next-line no-console
+        console.error('Widget Zadarma no inicializado:', err)
+        toast.error('No pude cargar el teléfono web de Zadarma. Revisa la consola.')
+      }
+    }
+
+    init()
+  }, [])
 
   // Recarga cuando cambia el modo o la campaña
   useEffect(() => {

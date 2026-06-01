@@ -46,8 +46,15 @@ class ZadarmaService:
     api_key, api_secret
         Credenciales de la API Zadarma (panel > integraciones).
     sip_username
-        Tu SIP interno (la "extensión de la centralita"). Ej.: '098765' o '098765-100'.
-        Zadarma llama a este SIP primero antes de marcar el número del prospect.
+        SIP login completo de la centralita (ej. '561989-100'). Se usa tal cual para
+        /v1/webrtc/get_key/ y para inicializar el widget WebRTC en el frontend
+        (donde el SIP login completo es OBLIGATORIO — si pasas solo '100' el widget
+        responde 'integrationDisabled'). En cambio, para /v1/request/callback/ el
+        parámetro `from` tiene patrón `^(\\+?[0-9]{7,15}|[0-9]{3,5})$` (OpenAPI
+        oficial) que NO acepta guiones — si pasas '561989-100' Zadarma lo
+        interpreta como número externo '561989100' y la llamada se va al limbo.
+        Por eso el método `callback()` extrae solo la parte de extensión (después
+        del último '-') para usar como `from`.
     """
 
     def __init__(
@@ -64,8 +71,10 @@ class ZadarmaService:
             raise ZadarmaError("Falta ZADARMA_SIP_USERNAME en el .env raíz")
         self._api_key = api_key
         self._api_secret = api_secret
-        # Normalizo: quito '+', espacios, guiones para que firma y URL coincidan
-        self._sip = sip_username.lstrip("+").replace(" ", "").replace("-", "")
+        # Normalizo: quito '+' y espacios. NO quito guiones: una extensión de
+        # centralita usa el formato {pbx_id}-{ext}, p.ej. "561989-100", y el
+        # guion es significativo para Zadarma.
+        self._sip = sip_username.lstrip("+").replace(" ", "")
         self._timeout = timeout
 
     def _sign(self, method: str, params: dict[str, str]) -> str:
@@ -142,9 +151,88 @@ class ZadarmaService:
         """
         # Normalizar: Zadarma quiere el número sin '+'
         to = to_number.lstrip("+").replace(" ", "").replace("-", "")
+
+        # `from` debe ser número (7-15 dígitos) o extensión corta (3-5 dígitos)
+        # según el regex oficial de la OpenAPI de Zadarma. Si el SIP configurado
+        # viene en formato login-completo `pbxId-ext` (p.ej. '561989-100'),
+        # extraemos solo la extensión (lo que va después del último guion):
+        #   '561989-100' → '100'      ✓ válido para /v1/request/callback/
+        #   '100'         → '100'      ✓ ya válido
+        #   '34936942094' → '34936942094' ✓ número internacional (no extensión)
+        # Sin esto, '561989-100' se desnormaliza a '561989100' y Zadarma lo
+        # trata como un número externo de 9 dígitos en vez de la extensión PBX.
+        from_value = self._sip.rsplit("-", 1)[-1] if "-" in self._sip else self._sip
+
         params = {
-            "from": self._sip,
+            "from": from_value,
             "to": to,
             "predicted": "true" if predicted else "false",
         }
         return await self._request("/v1/request/callback/", params)
+
+    async def diagnose(self) -> dict[str, Any]:
+        """
+        Diagnóstico end-to-end del estado Zadarma desde el punto de vista del
+        SDR. Llama a varios endpoints de Zadarma en paralelo y devuelve un
+        resumen consolidado.
+
+        Doc:
+        - /v1/info/balance/ → saldo
+        - /v1/pbx/internal/{ext}/status/ → si la extensión está online (registrada)
+        - /v1/webrtc/ (GET) → lista de usuarios WebRTC creados
+        - /v1/webrtc/domain/ (GET) → dominios autorizados para usar widget
+        - /v1/sip/ → SIPs plano (líneas)
+        """
+        result: dict[str, Any] = {
+            "configured_sip": self._sip,
+            "interpretation_warning": (
+                "Si configured_sip lleva guion (ej '561989-100'), Zadarma puede "
+                "interpretarlo como número externo en /v1/request/callback/. "
+                "Para callback, el formato correcto es solo el número de extensión "
+                "(ej '100')."
+            ),
+        }
+
+        async def _safe(label: str, method: str, params: dict[str, str] | None = None) -> None:
+            try:
+                result[label] = await self._request(method, params or {})
+            except Exception as exc:  # noqa: BLE001
+                result[label] = {"error": str(exc)}
+
+        await _safe("balance", "/v1/info/balance/")
+        await _safe("pbx_ext_100_status", "/v1/pbx/internal/100/status/")
+        await _safe("pbx_ext_101_status", "/v1/pbx/internal/101/status/")
+        await _safe("sip_899737_status", "/v1/sip/899737/status/")
+        await _safe("webrtc_users", "/v1/webrtc/")
+        await _safe("webrtc_domains", "/v1/webrtc/domain/")
+        await _safe("sip_lines", "/v1/sip/")
+        await _safe("pbx_redirection", "/v1/pbx/redirection/")
+        # Lista de TODAS las extensiones PBX configuradas (revela si hay
+        # más extensiones que las que asumimos):
+        await _safe("pbx_all_internal", "/v1/pbx/internal/")
+
+        return result
+
+    async def get_webrtc_key(self, sip: str | None = None) -> dict[str, Any]:
+        """
+        Pide a Zadarma una clave temporal para inicializar el widget WebRTC
+        embebido en el dialer.
+
+        Doc: https://zadarma.com/en/support/api/#api_request_webrtc_get_key
+
+        Parameters
+        ----------
+        sip : str | None
+            SIP login o extensión de PBX completa (p.ej. '561989-100'). Si no se
+            indica, usa el sip_username configurado del servicio.
+
+        Returns
+        -------
+        dict { status, key, ...} — `key` es la clave temporal (válida ~72h)
+        que se pasa al widget como primer argumento de `zadarmaWidgetFn`.
+        """
+        # /v1/webrtc/get_key/ usa el parámetro `sip`
+        return await self._request(
+            "/v1/webrtc/get_key/",
+            {"sip": (sip or self._sip)},
+        )

@@ -5,12 +5,19 @@ import { BookOpen, Copy, ChevronDown, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
-import { SCRIPT_SECTIONS } from '@/lib/sdr/scripts'
+import { getScriptForCampaign } from '@/lib/sdr/scripts'
+import { useCallSessionStore } from '@/store/useCallSessionStore'
 
 export function ScriptReference() {
   const [openIds, setOpenIds] = useState<Set<string>>(new Set(['apertura']))
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+
+  const campaign = useCallSessionStore((s) => s.campaign)
+  const campaigns = useCallSessionStore((s) => s.campaigns)
+  const sections = getScriptForCampaign(campaign)
+  const campaignLabel =
+    campaigns.find((c) => c.id === campaign)?.label ?? 'Guion genérico'
 
   function toggle(id: string) {
     setOpenIds((prev) => {
@@ -32,12 +39,12 @@ export function ScriptReference() {
   }
 
   const filtered = query.trim()
-    ? SCRIPT_SECTIONS.filter(
+    ? sections.filter(
         (s) =>
           s.title.toLowerCase().includes(query.toLowerCase()) ||
           s.body.toLowerCase().includes(query.toLowerCase())
       )
-    : SCRIPT_SECTIONS
+    : sections
 
   return (
     <aside className="w-80 shrink-0 border-l border-border bg-card flex flex-col h-full">
@@ -46,7 +53,7 @@ export function ScriptReference() {
         <div>
           <p className="tag-label text-brand-purple-dark">Script SDR</p>
           <p className="text-xs text-muted-foreground leading-tight">
-            Guion de Lucía
+            {campaignLabel}
           </p>
         </div>
       </div>

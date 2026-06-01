@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     zadarma_api_secret: str = ""
     zadarma_sip_username: str = ""
     smartlead_api_key: str = ""
+    groq_api_key: str = ""  # Whisper — transcripción de grabaciones de llamadas Zadarma
     admin_token: str = ""  # Auth para endpoints /admin/* — n8n lo manda en X-Admin-Token
 
     class Config:

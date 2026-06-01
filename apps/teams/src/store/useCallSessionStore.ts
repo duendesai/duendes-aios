@@ -10,9 +10,13 @@ const QUEUE_MODE_STORAGE_KEY = 'teams-sdr-queue-mode'
 const QUEUE_CAMPAIGN_STORAGE_KEY = 'teams-sdr-campaign'
 
 function loadInitialMode(): QueueMode {
-  if (typeof window === 'undefined') return 'all'
+  if (typeof window === 'undefined') return 'warm_opened'
   const saved = window.localStorage.getItem(QUEUE_MODE_STORAGE_KEY) as QueueMode | null
-  return saved === 'warm' || saved === 'cold' || saved === 'all' ? saved : 'all'
+  // Acepta solo los modos nuevos; valores antiguos ('warm', 'all') migran al default.
+  if (saved === 'warm_opened' || saved === 'warm_not_opened' || saved === 'cold') {
+    return saved
+  }
+  return 'warm_opened'
 }
 
 function loadInitialCampaign(): string {
