@@ -31,7 +31,7 @@ import { Card } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn, normalizePhoneEs } from '@/lib/utils'
 import { useCallSessionStore } from '@/store/useCallSessionStore'
-import { dialProspect, analyzeCall, ApiError } from '@/lib/sdr/api'
+import { analyzeCall, ApiError } from '@/lib/sdr/api'
 import type {
   AnalyzeResult,
   DatosEnriquecidos,
@@ -98,41 +98,58 @@ export function CallPanel() {
   const normalizedPhone = normalizePhoneEs(prospect.phone)
   const canCall = !!normalizedPhone && callState === 'idle' && !dialing
 
-  async function handleCall() {
+  function handleCall() {
     if (!normalizedPhone || !prospect) return
+
+    // Llamada saliente DIRECTA por el widget WebRTC (webphone de la ext 100).
+    // El widget manda el INVITE a la PBX → la llamada sale por Zadarma y se graba
+    // en la nube (aparece en /v1/statistics/pbx/, el botón "Analizar" la encuentra).
+    //
+    // Por qué NO el callback API (POST /calls/zadarma/dial): VERIFICADO en vivo
+    // (2026-06-01) que la pata entrante del callback NUNCA suena en el widget —
+    // la ext 100 figura is_online=false para registros WebRTC y Zadarma no le
+    // entrega la llamada entrante. El INVITE saliente directo es el mecanismo
+    // nativo del webphone (apiWidget.call), no el callback.
+    const w = window as unknown as {
+      zdrmWPhI?: { apiWidget?: { call?: (n: string) => void } }
+    }
+    const api = w.zdrmWPhI?.apiWidget
+
+    // Respaldo: dejar el número escrito en el input del widget. Si la API no
+    // auto-marca por lo que sea, basta con pulsar el botón verde del widget.
+    const input = document.getElementById(
+      'zdrm-webphone-phonenumber-input'
+    ) as HTMLInputElement | null
+    if (input) {
+      input.value = normalizedPhone
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+
+    if (!api || typeof api.call !== 'function') {
+      toast.error(
+        'El teléfono web de Zadarma aún no está listo. Espera unos segundos y reintenta (o recarga con Ctrl+Shift+R).'
+      )
+      return
+    }
+
     setDialing(true)
     try {
-      // Modelo callback API (probado, funciona).
-      // El widget WebRTC outbound directo está bloqueado por la PBX
-      // (envía INVITE → FAIL inmediato). En cambio el callback API hace:
-      //   1) backend → POST /v1/request/callback/
-      //   2) Zadarma llama PRIMERO a la extensión 100 (suena en el widget)
-      //   3) cuando contestas, Zadarma marca al destino y une las dos patas
-      //   4) la conversación queda grabada en la nube + visible en /v1/statistics/pbx/
-      // Pre-requisito: la extensión 100 NO debe tener desvío externo activo
-      // (si está activo, la pata entrante se la come ElevenLabs y nunca suena
-      // en el widget).
-      await dialProspect({
-        prospect_id: prospect.id,
-        phone: normalizedPhone,
-      })
-
+      api.call(normalizedPhone)
       toast.success(
         <span>
-          Llamada iniciada. Acepta la llamada entrante en el widget.{' '}
-          <strong>Pulsa H o Esc para colgar.</strong>
+          Llamando a {normalizedPhone}…{' '}
+          <strong>Pulsa el botón rojo del widget para colgar.</strong>
         </span>,
         { duration: 5000 }
       )
       startCall()
     } catch (err) {
-      const msg =
-        err instanceof ApiError
-          ? err.message
-          : err instanceof Error
-          ? err.message
-          : 'Error desconocido'
-      toast.error(`No pude iniciar la llamada: ${msg}`)
+      // La API no pudo auto-marcar; el número ya quedó puesto en el widget.
+      toast(
+        'Número puesto en el teléfono web. Pulsa el botón verde del widget para llamar.',
+        { duration: 6000 }
+      )
+      startCall()
     } finally {
       setDialing(false)
     }

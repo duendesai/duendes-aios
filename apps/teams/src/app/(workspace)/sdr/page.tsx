@@ -104,7 +104,11 @@ export default function SdrPage() {
     if (w.__zadarmaWidgetLoaded) return
     w.__zadarmaWidgetLoaded = true
 
-    const SIP_LOGIN = '100'
+    // SIP login COMPLETO (pbxId-ext). VERIFICADO en vivo 2026-06-01: el widget
+    // rechaza '100' con `integrationDisabled: wrong key or sip` porque el backend
+    // mintea la key para '561989-100' (get_webrtc_key usa el SIP completo) y key+sip
+    // deben COINCIDIR. Con '561989-100' registra/conecta limpio. NO cambiar a '100'.
+    const SIP_LOGIN = '561989-100'
     const LIB =
       'https://my.zadarma.com/webphoneWebRTCWidget/v9/js/loader-phone-lib.js?sub_v=1'
     const FN =
