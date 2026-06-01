@@ -32,6 +32,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn, normalizePhoneEs } from '@/lib/utils'
 import { useCallSessionStore } from '@/store/useCallSessionStore'
 import { analyzeCall, ApiError } from '@/lib/sdr/api'
+import { hangupZadarmaWidget } from '@/lib/sdr/zadarmaWidget'
 import type {
   AnalyzeResult,
   DatosEnriquecidos,
@@ -199,7 +200,13 @@ export function CallPanel() {
             <div className="shrink-0">
               {callState === 'in_call' ? (
                 <Button
-                  onClick={endCall}
+                  onClick={() => {
+                    // Colgar la llamada en el WIDGET de verdad (no solo cambiar
+                    // el estado de React). Sin esto, la sesión SIP seguía viva y
+                    // el botón verde del widget la re-marcaba en bucle.
+                    hangupZadarmaWidget()
+                    endCall()
+                  }}
                   variant="destructive"
                   size="lg"
                   className="gap-2"

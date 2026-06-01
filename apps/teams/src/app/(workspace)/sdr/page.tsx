@@ -22,6 +22,7 @@ import {
 } from '@/lib/sdr/api'
 import { useKeyboardShortcuts } from '@/lib/sdr/useKeyboardShortcuts'
 import { DISPOSITION_OPTIONS } from '@/lib/sdr/enums'
+import { hangupZadarmaWidget } from '@/lib/sdr/zadarmaWidget'
 
 export default function SdrPage() {
   const searchParams = useSearchParams()
@@ -239,10 +240,16 @@ export default function SdrPage() {
       }
     },
     H: () => {
-      if (callState === 'in_call') endCall()
+      if (callState === 'in_call') {
+        hangupZadarmaWidget()
+        endCall()
+      }
     },
     Escape: () => {
-      if (callState === 'in_call') endCall()
+      if (callState === 'in_call') {
+        hangupZadarmaWidget()
+        endCall()
+      }
     },
     N: () => {
       if (callState === 'in_call') {
