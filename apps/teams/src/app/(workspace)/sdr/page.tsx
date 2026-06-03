@@ -298,9 +298,11 @@ export default function SdrPage() {
         <div className="flex-1 flex flex-col overflow-hidden">
           {callState === 'idle' && !showBooking && <CallPanel />}
 
-          {callState === 'in_call' && <CallPanel />}
-
-          {callState === 'wrap_up' && !showBooking && (
+          {/* in_call y wrap_up comparten layout: el panel de registro (notas +
+              tipificación) está visible DESDE que se inicia la llamada, para tomar
+              notas en directo. El CallForm NO se desmonta al pasar de in_call a
+              wrap_up, así que lo escrito durante la llamada se conserva. */}
+          {(callState === 'in_call' || callState === 'wrap_up') && !showBooking && (
             <div className="flex-1 overflow-hidden flex">
               <div className="flex-1 overflow-hidden flex flex-col">
                 <ScrollArea className="flex-1">
