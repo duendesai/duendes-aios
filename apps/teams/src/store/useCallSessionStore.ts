@@ -32,6 +32,69 @@ interface SessionStats {
   noContact: number
 }
 
+// ── Métricas DIARIAS ────────────────────────────────────────────────────────
+// El bloque "Sesión SDR" (tiempo de trabajo + llamadas/agendadas/...) acumula
+// durante el día natural y se reinicia solo al cambiar de día. Persistido en
+// localStorage de este navegador (no por apertura del dialer).
+const DAILY_STATE_STORAGE_KEY = 'teams-sdr-daily-state'
+
+function todayKey(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+    d.getDate()
+  ).padStart(2, '0')}`
+}
+
+function emptyStats(): SessionStats {
+  return { called: 0, booked: 0, lost: 0, callback: 0, noContact: 0 }
+}
+
+interface DailyState {
+  date: string
+  stats: SessionStats
+  workedSeconds: number
+}
+
+function loadDailyState(): DailyState {
+  const today = todayKey()
+  const fresh: DailyState = { date: today, stats: emptyStats(), workedSeconds: 0 }
+  if (typeof window === 'undefined') return fresh
+  try {
+    const raw = window.localStorage.getItem(DAILY_STATE_STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<DailyState>
+      if (parsed.date === today && parsed.stats) {
+        return {
+          date: today,
+          stats: { ...emptyStats(), ...parsed.stats },
+          workedSeconds: parsed.workedSeconds || 0,
+        }
+      }
+    }
+  } catch {
+    /* localStorage no disponible o corrupto → empezar limpio */
+  }
+  return fresh
+}
+
+function persistDailyState(
+  date: string,
+  stats: SessionStats,
+  workedSeconds: number
+): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(
+      DAILY_STATE_STORAGE_KEY,
+      JSON.stringify({ date, stats, workedSeconds })
+    )
+  } catch {
+    /* ignore */
+  }
+}
+
+const _initialDaily = loadDailyState()
+
 interface CallSessionState {
   // Queue
   prospects: Prospect[]
@@ -55,8 +118,9 @@ interface CallSessionState {
   showBooking: boolean
   bookingPending: boolean
 
-  // Session metrics
-  sessionStartedAt: number
+  // Session metrics (DIARIAS — persisten el día natural; ver loadDailyState)
+  statsDate: string
+  workedSeconds: number
   stats: SessionStats
 
   // Actions
@@ -77,6 +141,7 @@ interface CallSessionState {
   nextProspect: () => void
   resetSession: () => void
   tickDuration: () => void
+  tickWorked: () => void
 
   // Computed
   getActiveProspect: () => Prospect | null
@@ -102,8 +167,9 @@ export const useCallSessionStore = create<CallSessionState>((set, get) => ({
   showBooking: false,
   bookingPending: false,
 
-  sessionStartedAt: Date.now(),
-  stats: { called: 0, booked: 0, lost: 0, callback: 0, noContact: 0 },
+  statsDate: _initialDaily.date,
+  workedSeconds: _initialDaily.workedSeconds,
+  stats: _initialDaily.stats,
 
   setQueue: (prospects) =>
     set((s) => ({
@@ -158,19 +224,29 @@ export const useCallSessionStore = create<CallSessionState>((set, get) => ({
   endCall: () => set({ callState: 'wrap_up' }),
 
   finishWrapUp: (outcome) =>
-    set((s) => ({
-      callState: 'idle',
-      callStartedAt: null,
-      callDurationSec: 0,
-      showBooking: false,
-      stats: {
-        called: s.stats.called + 1,
-        booked: s.stats.booked + (outcome === 'booked' ? 1 : 0),
-        lost: s.stats.lost + (outcome === 'lost' ? 1 : 0),
-        callback: s.stats.callback + (outcome === 'callback' ? 1 : 0),
-        noContact: s.stats.noContact + (outcome === 'no_contact' ? 1 : 0),
-      },
-    })),
+    set((s) => {
+      const today = todayKey()
+      // Si cambió el día desde la última actualización, parte de cero.
+      const base = s.statsDate === today ? s.stats : emptyStats()
+      const worked = s.statsDate === today ? s.workedSeconds : 0
+      const stats: SessionStats = {
+        called: base.called + 1,
+        booked: base.booked + (outcome === 'booked' ? 1 : 0),
+        lost: base.lost + (outcome === 'lost' ? 1 : 0),
+        callback: base.callback + (outcome === 'callback' ? 1 : 0),
+        noContact: base.noContact + (outcome === 'no_contact' ? 1 : 0),
+      }
+      persistDailyState(today, stats, worked)
+      return {
+        callState: 'idle',
+        callStartedAt: null,
+        callDurationSec: 0,
+        showBooking: false,
+        stats,
+        statsDate: today,
+        workedSeconds: worked,
+      }
+    }),
 
   openBooking: () => set({ showBooking: true }),
   closeBooking: () => set({ showBooking: false, bookingPending: false }),
@@ -198,21 +274,39 @@ export const useCallSessionStore = create<CallSessionState>((set, get) => ({
     })
   },
 
-  resetSession: () =>
+  resetSession: () => {
+    const today = todayKey()
+    persistDailyState(today, emptyStats(), 0)
     set({
-      sessionStartedAt: Date.now(),
-      stats: { called: 0, booked: 0, lost: 0, callback: 0, noContact: 0 },
+      statsDate: today,
+      workedSeconds: 0,
+      stats: emptyStats(),
       callState: 'idle',
       callStartedAt: null,
       callDurationSec: 0,
       showBooking: false,
-    }),
+    })
+  },
 
   tickDuration: () => {
     const { callState, callStartedAt } = get()
     if (callState === 'in_call' && callStartedAt) {
       set({ callDurationSec: Math.floor((Date.now() - callStartedAt) / 1000) })
     }
+  },
+
+  tickWorked: () => {
+    const today = todayKey()
+    const { statsDate, stats, workedSeconds } = get()
+    if (statsDate !== today) {
+      // Pasó la medianoche con el dialer abierto → reinicia el día.
+      persistDailyState(today, emptyStats(), 0)
+      set({ statsDate: today, stats: emptyStats(), workedSeconds: 0 })
+      return
+    }
+    const next = workedSeconds + 1
+    if (next % 5 === 0) persistDailyState(today, stats, next) // persistir cada 5s
+    set({ workedSeconds: next })
   },
 
   getActiveProspect: () => {

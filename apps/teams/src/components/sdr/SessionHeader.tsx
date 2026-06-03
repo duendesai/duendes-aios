@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Clock, PhoneCall, PhoneOff, Calendar, RotateCcw, Phone, Mail, MailOpen, Snowflake } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -57,14 +57,18 @@ export function SessionHeader({
 }: SessionHeaderProps) {
   const stats = useCallSessionStore((s) => s.stats)
   const mode = useCallSessionStore((s) => s.mode)
-  const sessionStartedAt = useCallSessionStore((s) => s.sessionStartedAt)
+  const workedSeconds = useCallSessionStore((s) => s.workedSeconds)
+  const tickWorked = useCallSessionStore((s) => s.tickWorked)
   const conversion = useCallSessionStore((s) => s.getConversionRate())
 
-  const [elapsedMs, setElapsedMs] = useState(0)
+  // Tiempo de trabajo DIARIO: suma 1s mientras el dialer esté abierto y la
+  // pestaña visible. El store lo persiste y lo reinicia solo al cambiar de día.
   useEffect(() => {
-    const id = setInterval(() => setElapsedMs(Date.now() - sessionStartedAt), 1000)
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') tickWorked()
+    }, 1000)
     return () => clearInterval(id)
-  }, [sessionStartedAt])
+  }, [tickWorked])
 
   return (
     <header className="h-20 shrink-0 border-b border-border px-6 flex items-center justify-between bg-card gap-6">
@@ -113,7 +117,7 @@ export function SessionHeader({
         <div>
           <p className="tag-label text-brand-purple-dark">Sesión SDR</p>
           <div className="font-display font-bold text-brand-dark text-base leading-tight mt-0.5">
-            {fmtElapsed(elapsedMs)}
+            {fmtElapsed(workedSeconds * 1000)}
           </div>
         </div>
 
@@ -156,7 +160,7 @@ export function SessionHeader({
           variant="ghost"
           size="sm"
           onClick={onReset}
-          title="Reiniciar contadores de la sesión"
+          title="Reiniciar contadores del día"
         >
           <RotateCcw className="h-4 w-4" />
         </Button>
