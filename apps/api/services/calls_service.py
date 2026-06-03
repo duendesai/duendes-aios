@@ -684,13 +684,17 @@ async def book_demo_and_create_lead(
             "Empresa": payload.get("empresa"),
             "Teléfono": payload.get("attendee_phone"),
             "Sector": payload.get("sector"),
-            "Fuente": "SDR Manual",
-            "Estado": "Demo agendada",
+            # CRM Leads (singleSelect): "Outreach" y "Reunión agendada" SÍ existen como
+            # opciones; "SDR Manual"/"Demo agendada" NO → Airtable las rechaza sin typecast.
+            "Fuente": "Outreach",
+            "Estado": "Reunión agendada",
             "Fecha reunión": booking["start"],
             "Cal Booking ID": booking["booking_uid"] or booking["booking_id"],
             "Notas": payload.get("notes") or f"Booking creado desde teams.duendes.net para prospect {prospect_id}",
         }
-        lead = await air.create_record(BASE_CRM, TABLE_LEADS, lead_fields)
+        # typecast=True: el Sector llega del category_name del prospecto (texto libre) y
+        # puede no existir como opción; con typecast Airtable la crea en vez de fallar.
+        lead = await air.create_record(BASE_CRM, TABLE_LEADS, lead_fields, typecast=True)
         lead_id = lead["id"]
         crm_url = f"https://airtable.com/{BASE_CRM}/{TABLE_LEADS}/{lead_id}"
     except Exception as exc:  # noqa: BLE001
