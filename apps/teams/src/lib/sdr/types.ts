@@ -39,6 +39,7 @@ export type MotivoPerdida =
   | 'RGPD/Origen datos'
   | 'Amenaza denuncia'
   | 'DNC explícito'
+  | 'Ilocalizable'
 
 export type Objecion =
   | 'Precio'

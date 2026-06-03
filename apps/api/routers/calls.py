@@ -78,6 +78,7 @@ MotivoPerdida = Literal[
     "RGPD/Origen datos",
     "Amenaza denuncia",
     "DNC explícito",
+    "Ilocalizable",
 ]
 MotivoFin = Literal["customer-ended-call", "no-answer", "voicemail", "busy", "failed"]
 

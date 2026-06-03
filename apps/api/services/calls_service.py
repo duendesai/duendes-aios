@@ -338,25 +338,52 @@ async def fetch_queue(
             if p["email_count"] > 0 or not p["has_email_contacto"]
         ]
 
-    # Sort distinto por modo
-    if mode == "warm_opened":
-        # Apertura más antigua primero (la curiosidad se enfría)
-        filtered.sort(key=_opened_sort_key)
-    elif mode == "warm_not_opened":
-        # Envío más antiguo primero (reserva, coherente con abiertos)
-        filtered.sort(key=_sent_sort_key)
-    elif mode == "cold":
-        # Score desc (los más cualificados primero), después Intentos asc
-        filtered.sort(
-            key=lambda p: (
-                -(p.get("score") or 0),
-                p.get("intentos", 0),
-            )
-        )
-    else:  # 'warm' / 'all' compat → sweet spot D+2..D+5 primero
-        filtered.sort(key=_warm_sort_key)
+    # ── Orden final por prioridad operativa (power-dialer) ──────────────────
+    # 1) Callbacks "Rellamar" cuya hora YA venció → arriba del todo, por hora ASC.
+    #    Saltan en CUALQUIER modo a partir de su hora exacta (compromiso pactado).
+    # 2) No llamados (Intentos == 0) → por el criterio del modo (apertura/envío/score).
+    # 3) Ya llamados sin cierre → al final: menos intentos + más tiempo sin llamada
+    #    primero. Rotan y se reintentan el mismo día (no esperan al siguiente).
+    # `now` ya está calculado arriba (en el post-filtro de callbacks).
+    def _is_callback_due(p: dict[str, Any]) -> bool:
+        if p.get("estado") != "Rellamar":
+            return False
+        proximo = p.get("proximo_intento")
+        if not proximo:
+            return False
+        try:
+            return datetime.fromisoformat(str(proximo).replace("Z", "+00:00")) <= now
+        except (ValueError, TypeError):
+            return False
 
-    return filtered[:max_records]
+    if mode == "warm_opened":
+        mode_key = _opened_sort_key
+    elif mode == "warm_not_opened":
+        mode_key = _sent_sort_key
+    elif mode == "cold":
+        mode_key = _cold_sort_key
+    else:  # 'warm' / 'all' compat
+        mode_key = _warm_sort_key
+
+    # Callbacks vencidos: se buscan en TODOS los dtos (no solo en el modo filtrado)
+    # para que salten aunque su email no encaje con el filtro del modo actual.
+    callbacks_due = sorted(
+        [p for p in dtos if _is_callback_due(p)],
+        key=lambda p: str(p.get("proximo_intento") or ""),
+    )
+    cb_ids = {p["id"] for p in callbacks_due}
+    rest = [p for p in filtered if p["id"] not in cb_ids]
+    nuevos = sorted(
+        [p for p in rest if int(p.get("intentos") or 0) == 0],
+        key=mode_key,
+    )
+    reintentos = sorted(
+        [p for p in rest if int(p.get("intentos") or 0) >= 1],
+        key=lambda p: (int(p.get("intentos") or 0), str(p.get("ultimo_intento") or "")),
+    )
+
+    ordered = callbacks_due + nuevos + reintentos
+    return ordered[:max_records]
 
 
 def _warm_sort_key(p: dict[str, Any]) -> tuple:
@@ -396,6 +423,11 @@ def _sent_sort_key(p: dict[str, Any]) -> tuple:
     le = p.get("last_email") or {}
     fecha = le.get("fecha_envio") or ""
     return (0 if fecha else 1, fecha)
+
+
+def _cold_sort_key(p: dict[str, Any]) -> tuple:
+    """Sort para cold: Score desc (más cualificados primero), después Intentos asc."""
+    return (-(p.get("score") or 0), int(p.get("intentos") or 0))
 
 
 async def count_campaigns(air: AirtableMultiClient) -> list[dict[str, Any]]:
@@ -632,7 +664,11 @@ async def submit_call_result(
 
     partial = False
     try:
-        await air.update_record(BASE_LUCIA, TABLE_MALAGA, prospect_id, update_fields)
+        # typecast=True: si "Motivo pérdida" recibe una opción nueva (p. ej.
+        # "Ilocalizable"), Airtable la crea en vez de rechazar el PATCH.
+        await air.update_record(
+            BASE_LUCIA, TABLE_MALAGA, prospect_id, update_fields, typecast=True
+        )
     except Exception as exc:  # noqa: BLE001
         logger.error("PATCH malaga falló tras POST Calls OK (%s): %s", prospect_id, exc)
         partial = True

@@ -52,6 +52,7 @@ export const MOTIVO_PERDIDA_OPTIONS: { value: MotivoPerdida; label: string }[] =
   { value: 'RGPD/Origen datos', label: 'RGPD / origen datos' },
   { value: 'Amenaza denuncia', label: 'Amenaza denuncia' },
   { value: 'DNC explícito', label: 'DNC explícito' },
+  { value: 'Ilocalizable', label: 'Ilocalizable' },
   { value: 'Otra', label: 'Otra' },
 ]
 
