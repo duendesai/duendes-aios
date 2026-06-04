@@ -88,6 +88,9 @@ EXCLUDED_FROM_QUEUE = [
     "No cualifica",
     "Ilocalizable",
     "No interesa ahora",
+    # Info solicitada: ya se envió la info; el seguimiento sigue por email/WhatsApp,
+    # no por llamada → fuera de la cola de llamadas (lead VIVO, no perdido).
+    "Info solicitada",
 ]
 
 # Status del último email que cuentan como "ya abrieron" (clicked y replied
