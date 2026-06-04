@@ -54,12 +54,12 @@ La marca Duendes tiene que transmitir: practicidad, confianza y cercanía. No so
 
 ### Idioma
 - Español de España. Siempre.
-- Tuteo en todo — ni ustedeo ni confianzas excesivas.
-- Evitar anglicismos cuando hay buena traducción española. Si no la hay, usar el término inglés sin complejos.
+- **Registro (tuteo o ustedeo)**: se decide caso a caso, en función de cómo el lead se comunica con sus propios clientes en su web pública. Si el lead tutea a su audiencia en su web ("acompañarte", "a tu medida"), nosotros le tuteamos. Si el lead trata de usted en su web (lenguaje formal, "Estimado cliente", títulos académicos visibles, despacho con tradición pre-2010), nosotros le tratamos de usted. Sin confianzas excesivas en ningún caso. Por defecto, ante ausencia de señales claras, tuteo.
+- Evitar anglicismos cuando hay equivalente patrimonial castellano. Si no lo hay, usar el término inglés sin complejos. El criterio sistémico está en `context/anti-anglosajismos.md`, que es lectura obligatoria del crew.
   - "Agente de voz" no "voice agent"
   - "Prospección" no "outreach" (salvo que sea jerga del sector que todo el mundo entiende)
   - "Gestión de citas" no "appointment scheduling"
-  - Pero: "onboarding", "pipeline", "lead" se pueden dejar si el contexto es B2B/ventas
+  - Aceptables: "onboarding", "pipeline", "lead" en contexto B2B/ventas porque son jerga asentada sin equivalente patrimonial limpio.
 
 ### Estructura
 - Frases cortas. Punto y seguido antes que coma.
@@ -69,7 +69,7 @@ La marca Duendes tiene que transmitir: practicidad, confianza y cercanía. No so
 ### Lo que nunca se hace
 - Sin emojis en exceso. Un emoji ocasional en LinkedIn está bien. Lluvia de emojis, no.
 - Sin signos de exclamación al final de cada frase.
-- Sin comillas para enfatizar — si algo es importante, que sea importante por el contenido, no por los signos.
+- Sin comillas para enfatizar. Si algo es importante, que sea importante por el contenido, no por los signos.
 - Sin "¡¡¡" ni "..." para crear tensión dramática.
 
 ---
@@ -80,7 +80,7 @@ La marca Duendes tiene que transmitir: practicidad, confianza y cercanía. No so
 > "En el vertiginoso mundo digital actual, las empresas se enfrentan a desafíos sin precedentes en la gestión de la experiencia del cliente. Duendes ofrece soluciones innovadoras de IA de voz que transforman la manera en que los negocios se relacionan con sus clientes."
 
 ### Bien (voz de Oscar/Duendes):
-> "Tu clínica pierde llamadas cada día. No porque no quieras cogerlas — sino porque estás con un paciente.
+> "Tu clínica pierde llamadas cada día. No porque no quieras cogerlas, sino porque estás con un paciente.
 > Un agente de voz resuelve eso. Responde, gestiona la cita, y tú te enteras después.
 > Eso es lo que hace Duendes."
 
