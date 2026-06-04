@@ -207,9 +207,109 @@ Prueba final antes de cada frase: ¿esto lo diría un abogado de 50 años explic
   },
 ]
 
+// ─── Webinar Colegios (campaña webinar-colegios) ────────────────────────────
+// Llamada al COLEGIO profesional (responsable de formación), no al colegiado.
+// Objetivo único: que el colegio acepte ofrecer un webinar formativo gratuito
+// de IA a sus colegiados. No se vende nada en la llamada: se gana autoridad y se
+// abre el canal. La consulta gratuita de 30 min es el CTA para los asistentes,
+// no para el colegio. Arranca con colegios de fisioterapeutas.
+const WEBINAR_COLEGIOS_SCRIPT: ScriptSection[] = [
+  {
+    id: 'mentalidad',
+    title: 'Mentalidad (antes de marcar)',
+    body: `No llamas a vender. Llamas a regalar formación de valor a sus colegiados y, de paso, a darte a conocer en el sector. El colegio gana contenido útil; tú ganas autoridad. Si no encaja, se dice con tranquilidad y no pasa nada.
+
+Trato de "vosotros" (te diriges al colegio como institución).
+
+Ten a la vista (2 min): nombre del colegio, comunidad, vía de contacto y el ángulo de la ficha del lead (columna Notas). Otros colegios ya forman en IA — esa es tu prueba social.`,
+  },
+  {
+    id: 'gatekeeper',
+    title: 'Pedir a la persona correcta · 20-30s',
+    body: `"Buenos días. Llamo de Duendes, una consultora de implantación de IA. ¿Me podría pasar con la persona responsable de formación o de actividades del colegio?"
+
+Si "¿de qué se trata?":
+"Es una propuesta de formación gratuita para vuestros colegiados, sin coste para el colegio. ¿Con quién lo puedo comentar?"
+
+Si no está:
+"Sin problema. ¿Cuándo suele ser buen momento para localizarle? Prefiero no dejar recado, es una conversación corta." → Registrar "Rellamar" con la fecha.`,
+  },
+  {
+    id: 'apertura',
+    title: 'Apertura con el responsable · 15-20s',
+    body: `"Buenos días. Os llamo de Duendes, una consultora que implanta IA en pequeñas empresas. Os llamo por un motivo concreto: ofrecemos un webinar formativo gratuito para vuestros colegiados sobre cómo la inteligencia artificial puede ayudarles en el día a día de la clínica. Sin coste ni compromiso para el colegio. Lo cuento porque otros colegios —Andalucía, Madrid, País Vasco, Asturias— ya están formando a sus colegiados en esto. ¿Tenéis un minuto?"
+
+→ CALLAR. No rellenar el silencio.`,
+  },
+  {
+    id: 'propuesta',
+    title: 'Qué es el webinar (no vendas, enseña)',
+    body: `"La idea no es vender nada. Es dar información útil de verdad a vuestros colegiados:
+• qué tareas de una clínica se pueden dejar resueltas con IA hoy
+• cuáles no merece la pena tocar
+• cómo empezar sin gastarse una fortuna
+
+Una hora, online, con demostración en vivo. Lo presentamos como formación, no como publicidad — por eso a vuestros colegiados les aporta."`,
+  },
+  {
+    id: 'cierre',
+    title: 'Cierre — siguiente paso (no compra) · 30-45s',
+    body: `"¿Le encajaría que os mandara una propuesta de una página por correo, para que la valoréis con la junta?"  → CALLAR.
+
+→ Captura el email DIRECTO de la persona de formación (no el genérico).
+→ Acuerda una fecha para volver a hablar: "¿Os llamo la semana que viene para ver qué os ha parecido?"
+→ Registra "Info solicitada" o "Rellamar" con la fecha.
+
+Salida digna (si "ahora no"):
+"Lo entiendo. ¿Os parece que os escriba y lo retomemos el próximo trimestre, o prefieres que no insista?" (Si no → "Perfecto, lo respeto. Gracias por vuestro tiempo.")`,
+  },
+  {
+    id: 'objeciones',
+    title: 'Objeciones',
+    body: `Reconoce → reencuadra → re-pregunta por la propuesta.
+
+"Ya tenemos formación / no nos interesa."
+→ "Justo por eso encaja: es formación gratuita que suma a vuestro catálogo, sin coste para el colegio. Y en IA hay mucha demanda de los colegiados ahora mismo."
+
+"¿Qué ganáis vosotros?"
+→ "Con transparencia: al final ofrecemos a quien quiera una consulta gratuita de 30 minutos, sin obligación. Quien quiera profundizar, lo hace; quien no, se queda con la formación. A nosotros nos da a conocer en el sector."
+
+"Mándame un email."  (es un sí)
+→ "Ahora mismo. ¿A qué dirección te lo mando para que llegue directo a ti?"
+
+"¿De dónde habéis sacado nuestro contacto?"
+→ "Vuestro colegio aparece en su propia web. Si preferís que no volvamos a contactar, lo retiro ahora mismo."`,
+  },
+  {
+    id: 'colegios',
+    title: 'Datos por colegio (personaliza)',
+    body: `CANTABRIA · sede@colfisiocant.org · vía "Oferta de colaboración"
+→ "Vi que tenéis hueco en la agenda formativa." (frío, mejor diana)
+
+ARAGÓN · administracion@colfisioaragon.org · canal "Difusión de actividades formativas"
+→ Menciona que usas su canal oficial de difusión.
+
+GALICIA · info@cofiga.org · secretaría
+→ Proximidad: "somos de aquí / cerca".
+
+CASTILLA Y LEÓN · nntt@cpfcyl.org · nuevas tecnologías
+→ "Para vuestras Jornadas de Actualización."`,
+  },
+  {
+    id: 'prohibidas',
+    title: 'Palabras prohibidas',
+    body: `NO uses: transformar, optimizar, escalar, potenciar, revolucionar, disruptivo, solución innovadora, sinergia, transformación digital, partner, proactivo, GRATIS (gritado).
+
+Di en su lugar: mejorar, sacar partido, quitar de en medio, dejar resuelto, que lo haga la máquina, sin coste, sin compromiso, poner en marcha, implantar.
+
+Prueba final: ¿esto se lo diría un profesional a un colega? Si suena a consultora de PowerPoint o a startup, fuera.`,
+  },
+]
+
 export const SCRIPTS_BY_CAMPAIGN: Record<string, ScriptSection[]> = {
   'fisios-malaga': FISIOS_SCRIPT,
   'despachos-madrid': DESPACHOS_SCRIPT,
+  'webinar-colegios': WEBINAR_COLEGIOS_SCRIPT,
 }
 
 export const DEFAULT_SCRIPT = FISIOS_SCRIPT
