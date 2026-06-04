@@ -48,3 +48,8 @@ node_modules/
 
 # n8n workflow backups — may contain hardcoded credentials
 workflows/backups/
+
+# Módulos independientes del AIOS (proyectos paralelos con su propio stack, deps
+# y datos pesados). Viven en local o en su propio repo, no en este monorepo.
+cold-outreach/
+voice-agent/
