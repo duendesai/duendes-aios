@@ -195,6 +195,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("n", nargs="?", type=int, default=25, help="Leads a cargar")
     parser.add_argument("--dry-run", action="store_true", help="No llama Smartlead, solo previsualiza")
+    parser.add_argument("--max-words", type=int, default=WORD_COUNT_MAX, help=f"Techo word_count (default {WORD_COUNT_MAX})")
     args = parser.parse_args()
 
     env = load_env()
@@ -210,7 +211,7 @@ def main() -> int:
         p for p in pool
         if p["email"].strip().lower() not in sent_emails
         and (p.get("company_name", "").strip().lower() not in REVISAR_COMPANIES)
-        and (p.get("word_count") or 0) <= WORD_COUNT_MAX
+        and (p.get("word_count") or 0) <= args.max_words
     ]
 
     register_dist = Counter(p.get("register") for p in candidates)
