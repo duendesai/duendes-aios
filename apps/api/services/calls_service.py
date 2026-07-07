@@ -13,16 +13,15 @@ from typing import Any
 
 from services.airtable_multi import (
     AirtableMultiClient,
-    BASE_CRM,
     BASE_LUCIA,
     CAMPAIGNS,
     TABLE_CALLS,
     TABLE_EMAILS,
-    TABLE_LEADS,
     TABLE_MALAGA,
     campaign_label,
 )
 from services.calcom_service import CalcomService
+from services.crm import CRMClient, Lead
 
 logger = logging.getLogger(__name__)
 
@@ -687,13 +686,18 @@ async def submit_call_result(
 async def book_demo_and_create_lead(
     air: AirtableMultiClient,
     calcom: CalcomService,
+    crm: CRMClient,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
     """
     Operación en cadena:
     1. POST Cal.com /bookings
-    2. POST appFIn3ntFb39vGXF/Leads (CRM)
+    2. Crear Lead vía el puerto `CRMClient` (adaptador resuelto por `CRM_BACKEND`)
     3. PATCH malaga con Agendada fecha + CRM Duendes URL
+
+    Con `CRM_BACKEND=airtable` (default) el paso 2 escribe en Airtable EXACTAMENTE
+    igual que antes del refactor (mismo mapeo de campos + typecast, mismo `crm_url`):
+    `AirtableCRMAdapter` reproduce el comportamiento vivo (regresión cero).
     """
     prospect_id = payload["prospect_id"]
     slot_start_str = payload["slot_start"]
@@ -713,30 +717,36 @@ async def book_demo_and_create_lead(
         metadata={"prospect_id": prospect_id, "source": "teams.duendes.net"},
     )
 
-    # 2. Crear Lead en CRM
+    # 2. Crear Lead vía el puerto CRM. Mismo vocabulario que el flujo vivo:
+    #    Fuente="Outreach" y Estado="Reunión agendada" existen en el singleSelect;
+    #    el resto (Sector libre) lo maneja el adaptador con typecast/normalización.
     lead_id: str | None = None
     crm_url: str | None = None
+    crm_sync_failed = False
+    crm_error: str | None = None
     try:
-        lead_fields = {
-            "Nombre": payload["attendee_name"],
-            "Email": payload["attendee_email"],
-            "Empresa": payload.get("empresa"),
-            "Teléfono": payload.get("attendee_phone"),
-            "Sector": payload.get("sector"),
-            # CRM Leads (singleSelect): "Outreach" y "Reunión agendada" SÍ existen como
-            # opciones; "SDR Manual"/"Demo agendada" NO → Airtable las rechaza sin typecast.
-            "Fuente": "Outreach",
-            "Estado": "Reunión agendada",
-            "Fecha reunión": booking["start"],
-            "Cal Booking ID": booking["booking_uid"] or booking["booking_id"],
-            "Notas": payload.get("notes") or f"Booking creado desde teams.duendes.net para prospect {prospect_id}",
-        }
-        # typecast=True: el Sector llega del category_name del prospecto (texto libre) y
-        # puede no existir como opción; con typecast Airtable la crea en vez de fallar.
-        lead = await air.create_record(BASE_CRM, TABLE_LEADS, lead_fields, typecast=True)
-        lead_id = lead["id"]
-        crm_url = f"https://airtable.com/{BASE_CRM}/{TABLE_LEADS}/{lead_id}"
+        lead = Lead(
+            nombre=payload["attendee_name"],
+            email=payload["attendee_email"],
+            telefono=payload.get("attendee_phone"),
+            empresa=payload.get("empresa"),
+            sector=payload.get("sector"),
+            fuente="Outreach",
+            estado="Reunión agendada",
+            fecha_reunion=booking["start"],
+            cal_booking_id=booking["booking_uid"] or booking["booking_id"],
+            notas=payload.get("notes")
+            or f"Booking creado desde teams.duendes.net para prospect {prospect_id}",
+        )
+        ref = await crm.create_lead(lead)
+        lead_id = ref.id
+        crm_url = ref.url
     except Exception as exc:  # noqa: BLE001
+        # El booking de Cal.com YA se creó; un fallo del CRM no debe reportarse
+        # como booking fallido. Se surfacea en la respuesta (crm_sync_failed) para
+        # que el frontend/n8n lo detecte y reintente, sin pérdida silenciosa.
+        crm_sync_failed = True
+        crm_error = str(exc)
         logger.error("Crear Lead CRM falló tras booking Cal.com OK: %s", exc)
 
     # 3. Actualizar malaga con la fecha y enlace al CRM
@@ -760,4 +770,6 @@ async def book_demo_and_create_lead(
         "end": booking["end"],
         "lead_id": lead_id,
         "crm_url": crm_url,
+        "crm_sync_failed": crm_sync_failed,
+        "crm_error": crm_error,
     }

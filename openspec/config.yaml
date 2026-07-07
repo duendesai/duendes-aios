@@ -1,0 +1,157 @@
+# openspec/config.yaml
+schema: spec-driven
+
+context: |
+  Polyglot monorepo: FastAPI (apps/api, no tests yet), CrewAI (cold-outreach,
+  pytest+ruff+mypy strict), VAPI voice (voice-agent, pytest+ruff+mypy strict),
+  Next.js 16 + React 19 (duendes-web, apps/teams — no test setup), TS n8n-mcp
+  (vendored gitlink, vitest — treat as out-of-scope unless explicitly asked),
+  n8n workflow JSON (workflows/), Supabase Postgres (supabase/migrations/, 1
+  migration so far). Markdown-driven agent orchestration (CLAUDE.md per module)
+  layered on top — modulos/{cmo,sdr,ae,coo,cfo,cs}/.
+  Architecture: hexagonal ports/adapters planned for CRM (Airtable -> Twenty).
+  Style: ruff+mypy strict (Python packages), eslint (Next.js apps).
+
+strict_tdd: false
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Identify affected modules/packages (specify which sub-project: apps/api, cold-outreach, voice-agent, duendes-web, apps/teams)
+  specs:
+    - Use Given/When/Then format for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+    - For cross-language changes, document the contract/interface (e.g. hexagonal port) before adapters
+  tasks:
+    - Group tasks by phase (infrastructure, implementation, testing)
+    - Use hierarchical numbering (1.1, 1.2, etc.)
+    - Keep tasks small enough to complete in one session
+    - Tag each task with its sub-project (apps/api, cold-outreach, voice-agent, duendes-web, apps/teams)
+  apply:
+    - Follow existing code patterns and conventions per sub-project
+    - Load relevant coding skills for the project stack (fastapi, pytest, python-pro, nextjs-15, typescript for the respective sub-project)
+    tdd: false
+    test_command: ""
+  verify:
+    - Run tests if test infrastructure exists for the touched sub-project
+    - Compare implementation against every spec scenario
+    test_command: ""
+    build_command: ""
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas (large removals)
+
+testing:
+  strict_tdd_mode: disabled
+  detected: "2026-07-01"
+  note: >
+    No single test command for the monorepo — test runner varies by
+    sub-project. strict_tdd is disabled at the global config level because
+    apps/api, duendes-web, and apps/teams (the modules most likely touched by
+    the upcoming CRM/Twenty migration) have NO test infrastructure. cold-outreach
+    and voice-agent DO have pytest+ruff+mypy strict and can run in TDD mode
+    individually if a change is scoped only to them.
+
+  subprojects:
+    apps_api:
+      path: apps/api
+      language: python
+      framework: fastapi
+      test_runner: NOT FOUND
+      test_command: null
+      unit_tests: false
+      integration_tests: false
+      e2e_tests: false
+      coverage: false
+      linter: NOT FOUND
+      type_checker: NOT FOUND
+      formatter: NOT FOUND
+      note: "No pytest, no test files. Most likely CRMClient port + Airtable adapter live here (services/airtable_multi.py already here)."
+
+    cold_outreach:
+      path: cold-outreach
+      language: python
+      framework: crewai
+      test_runner: pytest
+      test_command: "cd cold-outreach && uv run pytest"
+      unit_tests: true
+      integration_tests: true
+      e2e_tests: false
+      integration_tool: "respx (httpx mocking)"
+      coverage: false
+      linter: "ruff (uv run ruff check .)"
+      type_checker: "mypy --strict (uv run mypy .)"
+      formatter: "ruff format"
+      strict_tdd_eligible: true
+
+    voice_agent:
+      path: voice-agent
+      language: python
+      framework: "vapi + custom"
+      test_runner: pytest
+      test_command: "cd voice-agent && uv run pytest"
+      unit_tests: true
+      integration_tests: true
+      e2e_tests: false
+      integration_tool: "respx (httpx mocking)"
+      coverage: false
+      linter: "ruff (uv run ruff check .)"
+      type_checker: "mypy --strict (uv run mypy .)"
+      formatter: "ruff format"
+      strict_tdd_eligible: true
+
+    duendes_web:
+      path: duendes-web
+      language: typescript
+      framework: "next.js 16 + react 19"
+      test_runner: NOT FOUND
+      test_command: null
+      unit_tests: false
+      integration_tests: false
+      e2e_tests: false
+      coverage: false
+      linter: "eslint (npm run lint)"
+      type_checker: "tsc (implicit via next build)"
+      formatter: NOT FOUND
+      note: "Public marketing site, git submodule. No test setup."
+
+    apps_teams:
+      path: apps/teams
+      language: typescript
+      framework: "next.js 16 + react 19"
+      test_runner: NOT FOUND
+      test_command: null
+      unit_tests: false
+      integration_tests: false
+      e2e_tests: false
+      coverage: false
+      linter: "eslint (next lint)"
+      type_checker: "tsc"
+      formatter: NOT FOUND
+      note: "Internal SDR/teams app, uses Supabase client directly."
+
+    n8n_mcp:
+      path: n8n-mcp
+      language: typescript
+      framework: "MCP server for n8n"
+      test_runner: vitest
+      test_command: "cd n8n-mcp && npm run test:run"
+      unit_tests: true
+      integration_tests: true
+      e2e_tests: true
+      coverage: "vitest run --coverage"
+      linter: "tsc --noEmit"
+      type_checker: "tsc --noEmit"
+      formatter: NOT FOUND
+      note: "Vendored/forked gitlink dependency (git submodule-like, not declared in .gitmodules). Treat as OUT OF SCOPE for SDD apply/verify unless explicitly requested — this is a third-party tool, not authored code."
+
+    supabase:
+      path: supabase/migrations
+      language: sql
+      framework: "postgres migrations"
+      test_runner: NOT FOUND
+      migration_count: 1
+      note: "Only 001_initial_schema.sql exists so far. CRM migration will likely add Twenty-related tables/config here or provision Twenty separately (self-hosted, not Supabase-native)."

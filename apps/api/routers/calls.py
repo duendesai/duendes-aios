@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, EmailStr, Field
 
 from config import get_settings
-from deps import get_airtable, get_calcom, get_zadarma
+from deps import get_airtable, get_calcom, get_crm, get_zadarma
 from services.airtable_multi import (
     BASE_LUCIA,
     TABLE_CALLS,
@@ -27,6 +27,7 @@ from services.airtable_multi import (
     AirtableMultiClient,
 )
 from services.calcom_service import CalcomError, CalcomService
+from services.crm import CRMClient, CRMError
 from services.zadarma_service import ZadarmaError, ZadarmaService
 from services.call_analysis import CallAnalysisError, analyze_call
 from services.calls_service import (
@@ -240,11 +241,18 @@ async def post_booking(
     payload: BookingIn,
     air: AirtableMultiClient = Depends(get_airtable),
     calcom: CalcomService = Depends(get_calcom),
+    crm: CRMClient = Depends(get_crm),
 ) -> dict[str, Any]:
     try:
-        return await book_demo_and_create_lead(air, calcom, payload.model_dump())
+        return await book_demo_and_create_lead(air, calcom, crm, payload.model_dump())
     except CalcomError as exc:
         raise HTTPException(status_code=422, detail=f"Cal.com rechazó el booking: {exc}")
+    except CRMError as exc:
+        # Defensivo: book_demo_and_create_lead surfacea hoy los fallos de CRM en la
+        # respuesta (crm_sync_failed=true), NO los propaga, para no reportar como
+        # fallido un booking de Cal.com que sí se creó. Este 502 solo se alcanzaría
+        # si un cambio futuro dejara escapar un CRMError.
+        raise HTTPException(status_code=502, detail=f"CRM: {exc}")
     except AirtableError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
 

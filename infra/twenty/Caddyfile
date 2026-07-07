@@ -1,0 +1,12 @@
+# /opt/twenty-crm/Caddyfile en el VPS dedicado netcup (crm.duendes.net).
+# Caddy gestiona SSL automático con Let's Encrypt (HTTP-01 challenge por el
+# puerto 80, luego sirve en 443). Requiere que el DNS de crm.duendes.net ya
+# resuelva a la IP del VPS antes de arrancar (ver SETUP.md, paso 3).
+
+crm.duendes.net {
+    encode gzip
+
+    reverse_proxy server:3000 {
+        flush_interval -1
+    }
+}

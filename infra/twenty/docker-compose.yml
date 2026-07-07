@@ -1,0 +1,108 @@
+# /opt/twenty-crm/docker-compose.yml en el VPS dedicado netcup (crm.duendes.net).
+#
+# Stack de Twenty CRM self-hosted, aislado: este VPS NO comparte Postgres/Redis
+# con ningún otro stack de Duendes (a diferencia de infra/hetzner/, que multiplexa
+# varios servicios). Aquí solo vive Twenty (server + worker + su propia db + redis)
+# más Caddy para TLS automático.
+#
+# Basado en el docker-compose.yml oficial de twentyhq/twenty
+# (packages/twenty-docker/docker-compose.yml), adaptado con tres decisiones propias:
+#   1. restart: unless-stopped en vez de restart: always (oficial usa "always").
+#      En un VPS dedicado que a veces se para a propósito (mantenimiento, resize),
+#      "unless-stopped" respeta un `docker compose stop` manual sin resucitar
+#      los contenedores en el próximo boot del daemon si los paramos nosotros.
+#   2. TODO el entorno de server/worker/db vía env_file: .env — nada de secretos
+#      inline con interpolación ${VAR} en este archivo, como sí hace el oficial.
+#      Así el compose es seguro de versionar (si algún día se versiona) y el
+#      único sitio con secretos reales es .env (fuera de git).
+#   3. TAG sin fallback a "latest": si .env no define TAG, `docker compose up`
+#      debe fallar con "variable not set" en vez de tirar silenciosamente la
+#      imagen `latest` (rompe reproducibilidad — ver env.example.txt).
+#
+# Variables necesarias: ver env.example.txt (plantilla real de .env — ver nota
+# sobre el nombre del fichero en SETUP.md). Copia env.example.txt -> .env y rellena.
+
+services:
+  server:
+    image: twentycrm/twenty:${TAG:?Debes definir TAG en .env, ej. TAG=v2.17.0 — nunca uses 'latest' en producción}
+    env_file:
+      - .env
+    volumes:
+      - server-local-data:/app/packages/twenty-server/.local-storage
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: curl --fail http://localhost:3000/healthz
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  worker:
+    image: twentycrm/twenty:${TAG:?Debes definir TAG en .env, ej. TAG=v2.17.0 — nunca uses 'latest' en producción}
+    env_file:
+      - .env
+    volumes:
+      - server-local-data:/app/packages/twenty-server/.local-storage
+    command: ["yarn", "worker:prod"]
+    # El worker fuerza estos dos a "true" aunque .env traiga otra cosa: las
+    # migraciones y el registro de crons ya los gestiona el servicio `server`,
+    # así que el worker nunca debe repetirlos. Es la única razón para tocar
+    # `environment:` aquí en vez de dejarlo todo en env_file — son valores
+    # estructurales fijos del worker, no secretos ni config de despliegue.
+    environment:
+      DISABLE_DB_MIGRATIONS: "true"
+      DISABLE_CRON_JOBS_REGISTRATION: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+      server:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16
+    env_file:
+      - .env
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U ${PG_DATABASE_USER:-postgres} -h localhost -d postgres
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis
+    command: ["--maxmemory-policy", "noeviction"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - server
+
+volumes:
+  db-data:
+  server-local-data:
+  caddy_data:
+  caddy_config:
