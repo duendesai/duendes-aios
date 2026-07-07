@@ -10,17 +10,15 @@
 # hay que investigar ANTES de que haga falta un restore real.
 #
 # Uso:
-#   ./restore-test.sh                          # usa el dump más reciente en ./backups/
-#   ./restore-test.sh /ruta/a/otro.dump        # usa un dump concreto
-#   ./restore-test.sh --check-email foo@bar.com  # además, verifica que existe
-#                                                 # una persona con ese email
+#   ./restore-test.sh                            # usa el dump más reciente en ./backups/
+#   ./restore-test.sh /ruta/a/otro.dump          # usa un dump concreto
+#   ./restore-test.sh --check-email foo@bar.com  # además, verifica que existe una
+#                                                 # persona con ese email Y que sus
+#                                                 # custom fields del pipeline tienen valor
 #
-# TODO (Oscar): en este momento el workspace de Twenty todavía no tiene datos
-# reales, así que no hay un "email conocido" que verificar de forma fiable.
-# Cuando el pipeline comercial tenga datos reales, añade una llamada regular
-# a este script con --check-email apuntando a un contacto que sepas que debe
-# existir (p.ej. un lead que llevas meses trabajando), como segunda capa de
-# verificación además del chequeo de esquema.
+# Recomendado: corre esto periódicamente con --check-email apuntando a un lead
+# real que sepas que debe existir (p.ej. avancerehabilitacionsl@hotmail.com),
+# como segunda capa de verificación además del chequeo de esquema.
 
 set -euo pipefail
 
@@ -93,38 +91,53 @@ docker exec "$CONTAINER_NAME" pg_restore -U postgres -d restore_test --no-owner 
 }
 echo "✓ Restauración completada sin errores fatales."
 
-# ─── Sanity check 1: existe la tabla `person` con columnas clave ────────────
-# No comparamos el esquema exacto: cada workspace de Twenty puede tener
-# campos custom distintos añadidos desde la UI, así que un chequeo de
-# "columnas exactas" sería frágil. En vez de eso, verificamos que la tabla
-# existe y que tiene un número mínimo de columnas esperadas (id, name-ish,
-# email-ish), que es resiliente a customización del workspace.
-echo "▶ Verificando que la tabla 'person' existe y tiene columnas mínimas esperadas ..."
+# ─── Descubrir el esquema del workspace (dinámico: workspace_<id>) ──────────
+# Twenty guarda los datos de negocio en un esquema por workspace, NO en public.
+# El nombre cambia en cada instalación, así que lo descubrimos en runtime (esto
+# es lo que hacía fallar el chequeo de email: buscaba `person` en public).
+SCHEMA=$(docker exec "$CONTAINER_NAME" psql -U postgres -d restore_test -tAc \
+  "SELECT table_schema FROM information_schema.tables WHERE table_name = 'person' AND table_schema LIKE 'workspace%' ORDER BY 1 LIMIT 1;" | tr -d '[:space:]')
+
+if [ -z "$SCHEMA" ]; then
+  echo "ERROR: no encuentro la tabla 'person' en ningún esquema workspace_. Restore sospechoso." >&2
+  exit 1
+fi
+echo "✓ Esquema de workspace detectado: $SCHEMA"
+
+# ─── Sanity check 1: la tabla `person` existe con columnas mínimas ──────────
 COLUMN_COUNT=$(docker exec "$CONTAINER_NAME" psql -U postgres -d restore_test -tAc \
-  "SELECT count(*) FROM information_schema.columns WHERE table_name = 'person';")
+  "SELECT count(*) FROM information_schema.columns WHERE table_schema = '$SCHEMA' AND table_name = 'person';")
 
 if [ "${COLUMN_COUNT:-0}" -lt 5 ]; then
-  echo "ERROR: la tabla 'person' no existe o tiene muy pocas columnas ($COLUMN_COUNT). Restore sospechoso." >&2
+  echo "ERROR: la tabla 'person' tiene muy pocas columnas ($COLUMN_COUNT). Restore sospechoso." >&2
   exit 1
 fi
 echo "✓ Tabla 'person' presente con $COLUMN_COUNT columnas."
 
-# ─── Sanity check 2 (opcional): al menos una fila conocida es consultable ───
+# ─── Sanity check 2 (opcional): una fila conocida CON sus custom fields ─────
+# No basta con que el email exista: verificamos que los custom fields del
+# pipeline (sector, estadoDemo) tienen VALOR. Es lo que protege el backup
+# (hallazgo #7 de la auditoría: un restore que trae la tabla sin los datos de
+# los custom fields daría luz verde en falso).
 if [ -n "$CHECK_EMAIL" ]; then
-  echo "▶ Verificando que existe una persona con email '$CHECK_EMAIL' ..."
-  MATCH_COUNT=$(docker exec "$CONTAINER_NAME" psql -U postgres -d restore_test -tAc \
-    "SELECT count(*) FROM person WHERE \"emailsPrimaryEmail\" = '$CHECK_EMAIL';" 2>/dev/null || echo "0")
-  # Nota: el nombre exacto de la columna de email primario puede variar según
-  # versión de Twenty (emailsPrimaryEmail es el nombre en el esquema estándar
-  # de contactos). Si esta query falla por nombre de columna, revisa el
-  # esquema real con: \d person dentro del contenedor efímero.
-  if [ "${MATCH_COUNT:-0}" -lt 1 ]; then
+  echo "▶ Verificando la persona '$CHECK_EMAIL' y sus custom fields ..."
+  # -tA => campos separados por '|'. Sin swallow de errores: si la query falla,
+  # queremos verlo, no confundir un error con "no existe".
+  ROW=$(docker exec "$CONTAINER_NAME" psql -U postgres -d restore_test -tAc \
+    "SELECT sector, \"estadoDemo\" FROM \"$SCHEMA\".person WHERE \"emailsPrimaryEmail\" = '$CHECK_EMAIL' LIMIT 1;")
+  if [ -z "$ROW" ]; then
     echo "AVISO: no se encontró ninguna persona con email '$CHECK_EMAIL'. Revisa manualmente." >&2
   else
-    echo "✓ Encontrada al menos 1 persona con ese email."
+    SECTOR="${ROW%%|*}"
+    ESTADO="${ROW##*|}"
+    if [ -n "$SECTOR" ] && [ -n "$ESTADO" ]; then
+      echo "✓ Persona encontrada con custom fields poblados (sector=$SECTOR estadoDemo=$ESTADO)."
+    else
+      echo "AVISO: persona encontrada pero con custom fields vacíos (sector='$SECTOR' estadoDemo='$ESTADO'). El restore podría no traer los datos del pipeline." >&2
+    fi
   fi
 else
-  echo "( Sin --check-email: sáltate este chequeo hasta tener datos reales en el pipeline — ver TODO al inicio del script )"
+  echo "( Sin --check-email: pásalo con un email real, p.ej. --check-email lead@cliente.com )"
 fi
 
 echo ""
