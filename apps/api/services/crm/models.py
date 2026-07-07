@@ -14,6 +14,7 @@ documenta el vocabulario canónico y da autocompletado/typing al caller.
 """
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import dataclass, fields
 from typing import Literal
 
@@ -63,6 +64,20 @@ Estado = Literal[
 ]
 
 Provider = Literal["airtable", "twenty"]
+
+
+def option_value(label: str) -> str:
+    """Slugifica una etiqueta española al `value` UPPER_SNAKE que exige Twenty.
+
+    Fuente ÚNICA de verdad del mapeo etiqueta→value de los SELECT (sector, fuente,
+    estadoDemo): la usan tanto el `TwentyCRMAdapter` (al escribir/leer) como el
+    script de creación de campos, para que las opciones creadas y los valores
+    escritos coincidan. Ej.: "Clínica Dental" → "CLINICA_DENTAL".
+    """
+    nfkd = unicodedata.normalize("NFKD", label)
+    ascii_only = "".join(c for c in nfkd if not unicodedata.combining(c))
+    cleaned = "".join(c if c.isalnum() else " " for c in ascii_only)
+    return "_".join(cleaned.upper().split())
 
 
 @dataclass(frozen=True, slots=True)

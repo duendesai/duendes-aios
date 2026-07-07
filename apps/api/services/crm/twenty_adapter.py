@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, get_args
 
 import httpx
 
@@ -31,7 +31,15 @@ from services.crm.errors import (
     CRMNotFoundError,
     CRMValidationError,
 )
-from services.crm.models import Lead, LeadPatch, LeadRef
+from services.crm.models import (
+    Estado,
+    Fuente,
+    Lead,
+    LeadPatch,
+    LeadRef,
+    Sector,
+    option_value,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +99,34 @@ def _split_name(nombre: str | None) -> dict[str, str]:
     if len(parts) == 1:
         return {"firstName": parts[0], "lastName": ""}
     return {"firstName": parts[0], "lastName": parts[1]}
+
+
+# ── Mapeo SELECT: etiqueta español ↔ value enum (UPPER_SNAKE) que exige Twenty ───
+# Fuente única: los Literal de models.py + option_value(). Al escribir se traduce
+# la etiqueta a su enum; al leer, de vuelta a la etiqueta. Las opciones creadas en
+# Twenty usan exactamente estos value (mismo option_value), así que casan.
+def _build_maps(literal_type: Any) -> tuple[dict[str, str], dict[str, str]]:
+    l2e = {label: option_value(label) for label in get_args(literal_type)}
+    return l2e, {enum: label for label, enum in l2e.items()}
+
+
+_SECTOR_L2E, _SECTOR_E2L = _build_maps(Sector)
+_FUENTE_L2E, _FUENTE_E2L = _build_maps(Fuente)
+_ESTADO_L2E, _ESTADO_E2L = _build_maps(Estado)
+
+
+def _to_enum(label: str | None, l2e: dict[str, str]) -> str | None:
+    """Etiqueta → value enum. Desconocidos: slugify best-effort (Twenty validará)."""
+    if label is None:
+        return None
+    return l2e.get(label) or option_value(label)
+
+
+def _from_enum(value: str | None, e2l: dict[str, str]) -> str | None:
+    """Value enum → etiqueta. Desconocidos: se devuelve el value crudo."""
+    if value is None:
+        return None
+    return e2l.get(value, value)
 
 
 class TwentyCRMAdapter:
@@ -206,12 +242,12 @@ class TwentyCRMAdapter:
             payload["companyName"] = lead.empresa
         sector = _normalize_sector(lead.sector)
         if sector is not None:
-            payload["sector"] = sector
+            payload["sector"] = _to_enum(sector, _SECTOR_L2E)
         if lead.fuente is not None:
-            payload["fuente"] = lead.fuente
+            payload["fuente"] = _to_enum(lead.fuente, _FUENTE_L2E)
         estado = _normalize_estado(lead.estado)
         if estado is not None:
-            payload["estadoDemo"] = estado
+            payload["estadoDemo"] = _to_enum(estado, _ESTADO_L2E)
         fecha = _normalize_fecha_utc(lead.fecha_reunion)
         if fecha is not None:
             payload["fechaReunion"] = fecha
@@ -237,11 +273,11 @@ class TwentyCRMAdapter:
         if "empresa" in changed:
             payload["companyName"] = changed["empresa"]
         if "sector" in changed:
-            payload["sector"] = _normalize_sector(changed["sector"])
+            payload["sector"] = _to_enum(_normalize_sector(changed["sector"]), _SECTOR_L2E)
         if "fuente" in changed:
-            payload["fuente"] = changed["fuente"]
+            payload["fuente"] = _to_enum(changed["fuente"], _FUENTE_L2E)
         if "estado" in changed:
-            payload["estadoDemo"] = _normalize_estado(changed["estado"])
+            payload["estadoDemo"] = _to_enum(_normalize_estado(changed["estado"]), _ESTADO_L2E)
         if "fecha_reunion" in changed:
             payload["fechaReunion"] = _normalize_fecha_utc(changed["fecha_reunion"])
         if "cal_booking_id" in changed:
@@ -262,9 +298,9 @@ class TwentyCRMAdapter:
             email=emails.get("primaryEmail") or "",
             telefono=phones.get("primaryPhoneNumber"),
             empresa=person.get("companyName"),
-            sector=person.get("sector"),
-            fuente=person.get("fuente"),
-            estado=person.get("estadoDemo"),
+            sector=_from_enum(person.get("sector"), _SECTOR_E2L),
+            fuente=_from_enum(person.get("fuente"), _FUENTE_E2L),
+            estado=_from_enum(person.get("estadoDemo"), _ESTADO_E2L),
             fecha_reunion=person.get("fechaReunion"),
             cal_booking_id=person.get("calBookingId"),
             notas=person.get("notas"),

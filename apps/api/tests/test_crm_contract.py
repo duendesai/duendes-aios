@@ -385,9 +385,15 @@ async def test_twenty_normalizes_legacy_sector_and_estado(twenty_setup):
             _sample_lead(sector="Clínicas", estado="Nuevo", email="norm@test.test",
                          cal_booking_id="cal-norm-1")
         )
+        # Twenty almacena el value enum (UPPER_SNAKE), no la etiqueta española.
         person = fake.people[ref.id]
-        assert person["sector"] == "Salud"
-        assert person["estadoDemo"] == "Reunión agendada"
+        assert person["sector"] == "SALUD"
+        assert person["estadoDemo"] == "REUNION_AGENDADA"
+        # ...pero al leer vuelve a la etiqueta (round-trip enum → etiqueta).
+        back = await adapter.get_lead(ref)
+        assert back is not None
+        assert back.sector == "Salud"
+        assert back.estado == "Reunión agendada"
 
 
 async def test_airtable_does_not_normalize_legacy_values(airtable_setup):
