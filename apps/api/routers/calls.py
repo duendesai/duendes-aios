@@ -15,7 +15,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, EmailStr, Field
 
 from config import get_settings
@@ -28,6 +28,7 @@ from services.airtable_multi import (
 )
 from services.calcom_service import CalcomError, CalcomService
 from services.crm import CRMClient, CRMError
+from services.crm.models import Lead
 from services.zadarma_service import ZadarmaError, ZadarmaService
 from services.call_analysis import CallAnalysisError, analyze_call
 from services.calls_service import (
@@ -255,6 +256,74 @@ async def post_booking(
         raise HTTPException(status_code=502, detail=f"CRM: {exc}")
     except AirtableError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
+
+
+class CrmLeadIn(BaseModel):
+    """Payload para crear un Lead vía el puerto CRM (dual-write si CRM_BACKEND=dual).
+
+    Pensado para fuentes EXTERNAS que hoy escriben el Lead directo en Airtable
+    (p.ej. el workflow n8n de outcomes de llamadas): en vez de escribir a Airtable,
+    llaman aquí y el puerto hace el dual-write. Solo `nombre` es obligatorio.
+    """
+
+    nombre: str
+    email: Optional[str] = None
+    telefono: Optional[str] = None
+    empresa: Optional[str] = None
+    sector: Optional[str] = None
+    fuente: Optional[str] = None
+    estado: Optional[str] = None
+    fecha_reunion: Optional[str] = None
+    cal_booking_id: Optional[str] = None
+    notas: Optional[str] = None
+
+
+@router.post("/crm-lead")
+async def post_crm_lead(
+    payload: CrmLeadIn,
+    x_admin_token: str = Header(default=""),
+    crm: CRMClient = Depends(get_crm),
+) -> dict[str, Any]:
+    """Crea un Lead a través del puerto CRM (dual-write según CRM_BACKEND).
+
+    Protegido con X-Admin-Token (el mismo ADMIN_TOKEN que ya usa n8n). Un fallo
+    del CRM se surfacea en la respuesta (crm_sync_failed), no como 502 — igual que
+    /calcom/book: el que llama puede reintentar/alertar sin perder el dato en silencio.
+    """
+    admin_token = get_settings().admin_token
+    if admin_token and x_admin_token != admin_token:
+        raise HTTPException(status_code=401, detail="X-Admin-Token inválido o ausente")
+
+    lead = Lead(
+        nombre=payload.nombre,
+        email=payload.email or "",
+        telefono=payload.telefono,
+        empresa=payload.empresa,
+        sector=payload.sector,
+        fuente=payload.fuente,
+        estado=payload.estado,
+        fecha_reunion=payload.fecha_reunion,
+        cal_booking_id=payload.cal_booking_id,
+        notas=payload.notas,
+    )
+    lead_id: str | None = None
+    crm_url: str | None = None
+    crm_sync_failed = False
+    crm_error: str | None = None
+    try:
+        ref = await crm.create_lead(lead)
+        lead_id = ref.id
+        crm_url = ref.url
+    except Exception as exc:  # noqa: BLE001
+        crm_sync_failed = True
+        crm_error = str(exc)
+        logger.error("POST /crm-lead: crear Lead falló: %s", exc)
+    return {
+        "lead_id": lead_id,
+        "crm_url": crm_url,
+        "crm_sync_failed": crm_sync_failed,
+        "crm_error": crm_error,
+    }
 
 
 @router.post("/zadarma/dial")
