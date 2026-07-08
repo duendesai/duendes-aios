@@ -27,15 +27,30 @@
   - Sin gating por email (Emails borrado) y sin log `Calls` por ahora (el resultado
     actualiza el propio prospecto; objeto `llamada` = iteración futura).
 
-### ⬜ Pendiente
-- **164 abogados** (base nueva `appqDawY24kiaPWFu`): la key `pat58` NO ve esa base.
-  Necesita el PAT full-access que pedí a Oscar, o migrar vía el conector MCP.
-  Comando previsto: `migrate_prospectos.py --base appqDawY24kiaPWFu --table <tbl>`
-  (la tabla es `Table 1`, esquema ligeramente distinto: primary `Name`, puede faltar `phone`).
-- **Recableo teams-api del dialer** (lo crítico de esta tarde, ver abajo).
-- **Otras bases / orígenes** (sesiones siguientes, NO esta tarde): base CRM completa
-  (Clients/Projects/Invoices/Deals/Voice Agents/Zadarma), OUTREACH (428 leads cold-email),
-  tools ElevenLabs de LUC.IA, cold-outreach CrewAI, scripts AIOS, workflows n8n, Zapier.
+### ✅ CRM de negocio modelado en Twenty (2026-07-08)
+- Objetos custom `cliente`, `deal`, `invoice`, `proyecto`, `tarea` creados (calco de las
+  tablas de la base Airtable "Duendes CRM"). Script: `infra/twenty/create_crm_objects.py`.
+- **Decisión de Oscar:** objetos CUSTOM (no nativos) + **un solo corte grande** cuando esté
+  TODO reapuntado (el comercial sigue en Airtable hasta entonces).
+- **Sin datos que migrar:** la base Duendes CRM está casi vacía (Leads=1 ya en Twenty como
+  `person`; Clients/Projects/Invoices=0; Tareas/Deals=1 fila plantilla vacía). Los ÚNICOS
+  datos reales en todo Airtable son los prospectos del dialer.
+
+### ⬜ Pendiente para el corte único
+- **164 abogados** → `prospecto` (necesita PAT con acceso a base `Abogados` appqDawY24kiaPWFu;
+  `pat58` no la ve). `migrate_prospectos.py --base appqDawY24kiaPWFu --table <tbl>`.
+- **Reapuntar los escritores automáticos de Airtable a Twenty/teams-api** (los que estén VIVOS
+  — CONFIRMAR con Oscar cuáles corren de verdad):
+  - Tools ElevenLabs de LUC.IA (voz IA): `log_call`/`update_lead_outcome`/`create_crm_lead`
+    escriben Airtable directo → reapuntar a `/api/calls/result` + `/api/calls/crm-lead`
+    (ya escriben Twenty). Ojo: la config vive en ElevenLabs (dashboard/API), no solo en el repo.
+  - n8n webinar-lead → `/api/calls/crm-lead`.
+  - smartlead_sync / despachos_import (si el cold email está activo).
+- **CRM de negocio manual:** Oscar pasa a usar la UI de Twenty para clientes/deals/facturas
+  (los objetos ya están). No hay scripts vivos que migrar (la base está vacía + el modelo de
+  "departamentos" scripts/ está DISUELTO por el override del proyecto).
+- **Corte + apagado:** deploy teams-api + `DIALER_BACKEND=twenty`, verificar, Airtable
+  solo-lectura de reserva unos días, rotar los 2 PAT, retirar.
 
 ## Cables críticos del dialer (del inventario del repo)
 
