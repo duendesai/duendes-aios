@@ -37,20 +37,23 @@
   datos reales en todo Airtable son los prospectos del dialer.
 
 ### ⬜ Pendiente para el corte único
-- **164 abogados** → `prospecto` (necesita PAT con acceso a base `Abogados` appqDawY24kiaPWFu;
-  `pat58` no la ve). `migrate_prospectos.py --base appqDawY24kiaPWFu --table <tbl>`.
-- **Reapuntar los escritores automáticos de Airtable a Twenty/teams-api** (los que estén VIVOS
-  — CONFIRMAR con Oscar cuáles corren de verdad):
-  - Tools ElevenLabs de LUC.IA (voz IA): `log_call`/`update_lead_outcome`/`create_crm_lead`
-    escriben Airtable directo → reapuntar a `/api/calls/result` + `/api/calls/crm-lead`
-    (ya escriben Twenty). Ojo: la config vive en ElevenLabs (dashboard/API), no solo en el repo.
-  - n8n webinar-lead → `/api/calls/crm-lead`.
-  - smartlead_sync / despachos_import (si el cold email está activo).
-- **CRM de negocio manual:** Oscar pasa a usar la UI de Twenty para clientes/deals/facturas
-  (los objetos ya están). No hay scripts vivos que migrar (la base está vacía + el modelo de
-  "departamentos" scripts/ está DISUELTO por el override del proyecto).
-- **Corte + apagado:** deploy teams-api + `DIALER_BACKEND=twenty`, verificar, Airtable
-  solo-lectura de reserva unos días, rotar los 2 PAT, retirar.
+**Confirmado por Oscar (2026-07-08): el ÚNICO uso vivo de Airtable es el comercial humano
+marcando (Zadarma → teams-api), que YA está reapuntado a Twenty.** LUC.IA (voz IA), webinar
+n8n y cold email Smartlead están PARADOS / en pruebas. Así que jubilar Airtable = solo:
+
+1. **164 abogados** → `prospecto` (necesita PAT con acceso a base `Abogados` appqDawY24kiaPWFu;
+   `pat58` no la ve). `migrate_prospectos.py --base appqDawY24kiaPWFu --table <tbl>`.
+2. **Corte del dialer:** deploy teams-api + `DIALER_BACKEND=twenty`, verificar `/api/calls/queue`
+   + llamada de prueba (runbook de cutover arriba). Con el comercial parado.
+3. **Apagado:** Airtable solo-lectura de reserva unos días → rotar los 2 PAT → retirar.
+
+**Diferido hasta reactivación (NO bloquea el corte):** si algún día se reactivan LUC.IA / webinar
+/ cold email, reapuntar sus escritores a los endpoints de teams-api que ya escriben Twenty
+(`/api/calls/result`, `/api/calls/crm-lead`). Los objetos destino ya existen en Twenty.
+Ojo LUC.IA: su config de tools vive en ElevenLabs (dashboard/API), no solo en el repo.
+
+**CRM de negocio manual:** Oscar pasa a usar la UI de Twenty para clientes/deals/facturas
+(objetos ya creados, base Airtable vacía). Nada que migrar.
 
 ## Cables críticos del dialer (del inventario del repo)
 
