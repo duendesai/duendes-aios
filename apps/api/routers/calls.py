@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, EmailStr, Field
 
 from config import get_settings
-from deps import get_airtable, get_calcom, get_crm, get_zadarma
+from deps import get_airtable, get_calcom, get_crm, get_prospecto_twenty, get_zadarma
 from services.airtable_multi import (
     BASE_LUCIA,
     TABLE_CALLS,
@@ -40,6 +40,7 @@ from services.calls_service import (
     fetch_queue,
     submit_call_result,
 )
+from services import prospecto_twenty as ptw
 
 logger = logging.getLogger(__name__)
 
@@ -152,12 +153,20 @@ async def get_queue(
 
     `campaign` (slug, opcional): filtra por campaña (p.ej. `despachos-madrid`). Sin él, todas.
     """
+    settings = get_settings()
     try:
-        prospects = await fetch_queue(
-            air, max_records=max_records, mode=mode, campaign=campaign
-        )
+        if settings.dialer_backend == "twenty":
+            prospects = await ptw.fetch_queue(
+                get_prospecto_twenty(), max_records=max_records, mode=mode, campaign=campaign
+            )
+        else:
+            prospects = await fetch_queue(
+                air, max_records=max_records, mode=mode, campaign=campaign
+            )
     except AirtableError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
+    except Exception as exc:  # noqa: BLE001 — camino Twenty (httpx/GraphQL)
+        raise HTTPException(status_code=502, detail=f"dialer twenty: {exc}")
     return {
         "prospects": prospects,
         "total": len(prospects),
@@ -173,10 +182,17 @@ async def get_agenda(
     air: AirtableMultiClient = Depends(get_airtable),
 ) -> dict[str, Any]:
     """Callbacks programados (Estado=Rellamar) categorizados por urgencia."""
+    settings = get_settings()
     try:
+        if settings.dialer_backend == "twenty":
+            return await ptw.fetch_agenda(
+                get_prospecto_twenty(), days_ahead=days_ahead, campaign=campaign
+            )
         return await fetch_agenda(air, days_ahead=days_ahead, campaign=campaign)
     except AirtableError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
+    except Exception as exc:  # noqa: BLE001 — camino Twenty
+        raise HTTPException(status_code=502, detail=f"dialer twenty: {exc}")
 
 
 @router.get("/campaigns")
@@ -184,10 +200,16 @@ async def get_campaigns(
     air: AirtableMultiClient = Depends(get_airtable),
 ) -> dict[str, Any]:
     """Campañas disponibles para el selector del dialer, con conteo de prospectos activos."""
+    settings = get_settings()
     try:
-        campaigns = await count_campaigns(air)
+        if settings.dialer_backend == "twenty":
+            campaigns = await ptw.count_campaigns(get_prospecto_twenty())
+        else:
+            campaigns = await count_campaigns(air)
     except AirtableError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
+    except Exception as exc:  # noqa: BLE001 — camino Twenty
+        raise HTTPException(status_code=502, detail=f"dialer twenty: {exc}")
     return {"campaigns": campaigns}
 
 
@@ -196,12 +218,17 @@ async def get_prospect(
     prospect_id: str,
     air: AirtableMultiClient = Depends(get_airtable),
 ) -> dict[str, Any]:
+    settings = get_settings()
     try:
+        if settings.dialer_backend == "twenty":
+            return await ptw.fetch_prospect_detail(get_prospecto_twenty(), prospect_id)
         return await fetch_prospect_detail(air, prospect_id)
     except AirtableError as exc:
         if exc.status_code == 404:
             raise HTTPException(status_code=404, detail="Prospect not found")
         raise HTTPException(status_code=502, detail=str(exc))
+    except Exception as exc:  # noqa: BLE001 — camino Twenty
+        raise HTTPException(status_code=502, detail=f"dialer twenty: {exc}")
 
 
 @router.post("/result")
@@ -217,10 +244,18 @@ async def post_result(
             status_code=422,
             detail=f"{payload.disposition} requiere motivo_perdida",
         )
+    settings = get_settings()
     try:
-        result = await submit_call_result(air, payload.model_dump())
+        if settings.dialer_backend == "twenty":
+            result = await ptw.submit_call_result(
+                get_prospecto_twenty(), payload.model_dump()
+            )
+        else:
+            result = await submit_call_result(air, payload.model_dump())
     except AirtableError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
+    except Exception as exc:  # noqa: BLE001 — camino Twenty
+        raise HTTPException(status_code=502, detail=f"dialer twenty: {exc}")
     return result
 
 
@@ -244,7 +279,12 @@ async def post_booking(
     calcom: CalcomService = Depends(get_calcom),
     crm: CRMClient = Depends(get_crm),
 ) -> dict[str, Any]:
+    settings = get_settings()
     try:
+        if settings.dialer_backend == "twenty":
+            return await ptw.book_demo_and_create_lead(
+                calcom, crm, get_prospecto_twenty(), payload.model_dump()
+            )
         return await book_demo_and_create_lead(air, calcom, crm, payload.model_dump())
     except CalcomError as exc:
         raise HTTPException(status_code=422, detail=f"Cal.com rechazó el booking: {exc}")

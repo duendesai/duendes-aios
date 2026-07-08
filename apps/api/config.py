@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     twenty_base_url: str = ""  # p.ej. https://crm.duendes.net
     twenty_api_key: str = ""  # PAT de Twenty (env TWENTY_API_KEY)
 
+    # Dialer backend toggle (migración cola del dialer Airtable `malaga` → Twenty
+    # objeto `prospecto`). Independiente de `crm_backend` (ese es solo Leads/demos).
+    # - airtable = default, lee/escribe `malaga` en Airtable (flujo vivo del comercial)
+    # - twenty   = lee/escribe el objeto `prospecto` en Twenty
+    dialer_backend: Literal["airtable", "twenty"] = "airtable"
+
     class Config:
         env_file = "../../.env"
         extra = "ignore"
