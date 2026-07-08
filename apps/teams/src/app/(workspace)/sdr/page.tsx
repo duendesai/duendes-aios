@@ -157,6 +157,12 @@ export default function SdrPage() {
                 box-shadow: none !important;
                 border: none !important;
                 padding: 0 !important;
+              }
+              /* #zdrmWPhI es el contenedor fijo raíz del widget (incluye el
+                 marco gris .zdrm-webphone). Escalar aquí encoge TODO el
+                 widget como una sola unidad; escalar solo el interior
+                 (.zdrm-phone) dejaba el marco gris a tamaño completo. */
+              #zdrmWPhI {
                 transform: scale(0.72);
                 transform-origin: top right;
               }
