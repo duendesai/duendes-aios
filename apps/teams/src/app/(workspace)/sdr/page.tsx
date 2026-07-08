@@ -157,6 +157,8 @@ export default function SdrPage() {
                 box-shadow: none !important;
                 border: none !important;
                 padding: 0 !important;
+                transform: scale(0.72);
+                transform-origin: top right;
               }
             `
             document.head.appendChild(style)
