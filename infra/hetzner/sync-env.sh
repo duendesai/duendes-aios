@@ -32,6 +32,10 @@ VARS=(
   SUPABASE_ANON_KEY
   SMARTLEAD_API_KEY
   ADMIN_TOKEN
+  TWENTY_API_KEY
+  TWENTY_BASE_URL
+  CRM_BACKEND
+  DIALER_BACKEND
 )
 
 # Construir bloque con las vars leídas del .env local (sin imprimirlas)
