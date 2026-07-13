@@ -16,7 +16,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from config import get_settings
-from deps import get_airtable
+from deps import get_airtable, get_prospecto_twenty
 from services.airtable_multi import CAMPAIGNS, AirtableMultiClient
 from services.despachos_import import DespachosImportError, import_sent_leads
 from services.smartlead_sync import SmartleadSyncError, sync_campaign
@@ -50,12 +50,21 @@ async def post_import_campaign_leads(
         if campaign
         else [s for s, c in CAMPAIGNS.items() if c.get("import_source")]
     )
+    prospecto_client = (
+        get_prospecto_twenty() if settings.dialer_backend == "twenty" else None
+    )
     results: list[dict[str, Any]] = []
     for slug in slugs:
         if slug not in CAMPAIGNS:
             raise HTTPException(status_code=404, detail=f"Campaña desconocida: {slug}")
         try:
-            res = await import_sent_leads(air, settings.smartlead_api_key, slug)
+            res = await import_sent_leads(
+                air,
+                settings.smartlead_api_key,
+                slug,
+                dialer_backend=settings.dialer_backend,
+                prospecto_client=prospecto_client,
+            )
         except DespachosImportError as exc:
             raise HTTPException(status_code=502, detail=f"{slug}: {exc}")
         results.append(res)
@@ -70,6 +79,9 @@ async def post_sync_smartlead(
 ) -> dict[str, Any]:
     """Sincroniza Smartlead → Airtable. Sin `campaign`, sincroniza todas. Idempotente."""
     settings = get_settings()
+    prospecto_client = (
+        get_prospecto_twenty() if settings.dialer_backend == "twenty" else None
+    )
     slugs = [campaign] if campaign else list(CAMPAIGNS.keys())
     results: list[dict[str, Any]] = []
     for slug in slugs:
@@ -82,6 +94,8 @@ async def post_sync_smartlead(
                 airtable_api_key=settings.airtable_api_key,
                 campaign_id=cfg["smartlead_id"],
                 campaign_name=cfg["label"],
+                dialer_backend=settings.dialer_backend,
+                prospecto_client=prospecto_client,
             )
         except SmartleadSyncError as exc:
             raise HTTPException(status_code=502, detail=f"{slug}: {exc}")
