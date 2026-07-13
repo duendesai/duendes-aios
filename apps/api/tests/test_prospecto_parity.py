@@ -107,3 +107,34 @@ def test_date_compared_by_instant_not_string():
     }
     result = compare_prospecto(air, tw)
     assert result.is_clean
+
+
+def test_name_and_phone_fields_default_to_title_and_phone():
+    """Regresión fisios/malaga: sin overrides, name←title y phone←phone."""
+    air = {"id": "f1", "fields": {"title": "Fisio X", "phone": "+34600111222", "No llamar": False}}
+    tw = {"airtableId": "f1", "name": "Fisio X", "phone": "600111222", "noLlamar": False}
+    result = compare_prospecto(air, tw)
+    assert result.is_clean
+
+
+def test_abogados_layout_needs_field_overrides():
+    """Abogados: name en 'Name', phone en 'Attachment Summary'.
+
+    Con los defaults (title/phone) el comparador no los encuentra → ambos mismatch;
+    con los overrides correctos, queda limpio. Cubre el punto ciego que este fix resuelve.
+    """
+    air = {
+        "id": "a1",
+        "fields": {"Name": "Bufete Y", "Attachment Summary": "+34600333444", "No llamar": False},
+    }
+    tw = {"airtableId": "a1", "name": "Bufete Y", "phone": "600333444", "noLlamar": False}
+
+    # defaults: ni name ni phone se encuentran → ambos difieren
+    r_def = compare_prospecto(air, tw)
+    assert not r_def.is_clean
+    assert any(m.startswith("name:") for m in r_def.field_mismatches)
+    assert any(m.startswith("phone:") for m in r_def.field_mismatches)
+
+    # overrides correctos → limpio
+    r = compare_prospecto(air, tw, name_field="Name", phone_field="Attachment Summary")
+    assert r.is_clean

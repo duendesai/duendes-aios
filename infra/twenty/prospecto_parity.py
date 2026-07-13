@@ -110,9 +110,9 @@ def _norm_int(v: Any) -> int:
 
 # ── Especificación de campos a comparar (airtable_field, twenty_field, tipo) ────
 # tipo ∈ {"text", "phone", "instant", "int", "select:<field>"}
-_FIELD_SPECS: list[tuple[str, str, str]] = [
-    ("title", "name", "text"),
-    ("phone", "phone", "phone"),
+# name y phone NO van aquí: su campo Airtable de origen es configurable (los defaults
+# 'title'/'phone' valen para malaga/fisios; abogados usan 'Name'/'Attachment Summary').
+_FIELD_SPECS_REST: list[tuple[str, str, str]] = [
     ("Estado", "estado", "select:estado"),
     ("Prioridad", "prioridad", "select:prioridad"),
     ("Campaña", "campana", "select:campana"),
@@ -158,17 +158,25 @@ def _field_equal(kind: str, air_val: Any, tw_val: Any) -> bool:
     return _norm_text(air_val) == _norm_text(tw_val)
 
 
-def compare_prospecto(air_record: dict[str, Any], twenty_node: dict[str, Any]) -> ParityResult:
-    """Compara un registro `malaga` de Airtable contra su gemelo `prospecto` de Twenty.
+def compare_prospecto(
+    air_record: dict[str, Any],
+    twenty_node: dict[str, Any],
+    name_field: str = "title",
+    phone_field: str = "phone",
+) -> ParityResult:
+    """Compara un registro de Airtable contra su gemelo `prospecto` de Twenty.
 
     `air_record` es el registro crudo de Airtable ({"id", "fields": {...}}).
     `twenty_node` es el nodo GraphQL del prospecto (campos camelCase).
+    `name_field`/`phone_field` son los campos Airtable de origen para nombre y teléfono
+    (defaults 'title'/'phone' para malaga/fisios; 'Name'/'Attachment Summary' para abogados).
     """
     air_fields = air_record.get("fields", {})
     key = air_record.get("id") or twenty_node.get("airtableId") or "(sin id)"
 
+    specs = [(name_field, "name", "text"), (phone_field, "phone", "phone")] + _FIELD_SPECS_REST
     mismatches: list[str] = []
-    for air_key, tw_key, kind in _FIELD_SPECS:
+    for air_key, tw_key, kind in specs:
         av = air_fields.get(air_key)
         tv = twenty_node.get(tw_key)
         if not _field_equal(kind, av, tv):
@@ -237,7 +245,7 @@ def _fetch_twenty_by_airtable_id(tw_base: str, tw_key: str) -> dict[str, dict[st
         after = block["pageInfo"]["endCursor"]
 
 
-def run(base: str, table: str) -> int:
+def run(base: str, table: str, name_field: str = "title", phone_field: str = "phone") -> int:
     """Ejecuta el chequeo contra APIs reales. Devuelve nº de discrepancias de cumplimiento."""
     import os
 
@@ -259,7 +267,7 @@ def run(base: str, table: str) -> int:
         if node is None:
             missing.append(rec["id"])
             continue
-        result = compare_prospecto(rec, node)
+        result = compare_prospecto(rec, node, name_field=name_field, phone_field=phone_field)
         if result.compliance_mismatch:
             compliance_failures.append(result)
         if result.field_mismatches:
@@ -297,8 +305,13 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="app5WbiXR0qXGTc3r")   # LUCIA Bienestar
     ap.add_argument("--table", default="tblCyn7fjgBJM8rkF")  # malaga (fisios)
+    ap.add_argument("--name-field", default="title",
+                    help="Campo Airtable de origen del nombre (abogados: 'Name')")
+    ap.add_argument("--phone-field", default="phone",
+                    help="Campo Airtable de origen del teléfono (abogados: 'Attachment Summary')")
     args = ap.parse_args()
-    compliance_failures = run(args.base, args.table)
+    compliance_failures = run(args.base, args.table,
+                              name_field=args.name_field, phone_field=args.phone_field)
     # Salida != 0 si hay fallos de cumplimiento: sirve de puerta dura en un script.
     sys.exit(1 if compliance_failures else 0)
 
