@@ -142,6 +142,13 @@ class TwentyProspectoClient:
         data = await self._graphql(q, {"id": prospecto_id})
         return data.get("prospecto")
 
+    async def create(self, fields: dict[str, Any]) -> dict[str, Any]:
+        async with httpx.AsyncClient(timeout=self._timeout) as c:
+            r = await c.post(f"{self._base}/rest/prospectos",
+                             headers=self._headers(), json=fields)
+        r.raise_for_status()
+        return r.json()
+
     async def update(self, prospecto_id: str, fields: dict[str, Any]) -> None:
         async with httpx.AsyncClient(timeout=self._timeout) as c:
             r = await c.patch(f"{self._base}/rest/prospectos/{prospecto_id}",

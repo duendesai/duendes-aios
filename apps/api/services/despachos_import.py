@@ -24,9 +24,14 @@ from services.airtable_multi import (
     CAMPAIGNS,
     TABLE_MALAGA,
 )
+from services.crm.models import option_value
+from services.prospecto_twenty import CAMPANA, TwentyProspectoClient
 from services.smartlead_sync import _smartlead_stats
 
 logger = logging.getLogger(__name__)
+
+# Valores de campaña válidos en Twenty (para no mandar un select inexistente).
+_CAMPANA_VALUES = {option_value(x) for x in CAMPANA}
 
 
 class DespachosImportError(Exception):
@@ -71,12 +76,57 @@ def _lead_to_prospect_fields(lead_fields: dict[str, Any], label: str) -> dict[st
     }
 
 
+def _lead_to_prospecto_twenty_fields(lead_fields: dict[str, Any], label: str) -> dict[str, Any]:
+    """Mapea un row de duendes OUTREACH.Leads → fields del objeto `prospecto` de Twenty.
+
+    Espejo de `_lead_to_prospect_fields` pero con el esquema Twenty (camelCase + values
+    UPPER_SNAKE en los SELECT). Origen idéntico; sólo cambia el destino.
+    """
+    notas_parts: list[str] = []
+    if lead_fields.get("contact_role"):
+        notas_parts.append(f"Rol: {lead_fields['contact_role']}")
+    if lead_fields.get("notes"):
+        notas_parts.append(str(lead_fields["notes"]))
+    if lead_fields.get("linkedin_url"):
+        notas_parts.append(f"LinkedIn: {lead_fields['linkedin_url']}")
+
+    campana_value = option_value(label)
+    fields: dict[str, Any] = {
+        "name": (
+            lead_fields.get("company_name")
+            or lead_fields.get("contact_name")
+            or "(sin nombre)"
+        ),
+        "phone": lead_fields.get("phone"),
+        "city": _norm_city(lead_fields.get("city")),
+        "categoria": lead_fields.get("sector"),
+        "website": lead_fields.get("website"),
+        "email": lead_fields.get("email"),
+        "contactoNombre": lead_fields.get("contact_name"),
+        "notas": "\n".join(notas_parts) or None,
+        "campana": campana_value if campana_value in _CAMPANA_VALUES else None,
+        "estado": option_value("Pendiente"),
+        "intentos": 0,
+        "fuente": option_value("Cold email"),
+    }
+    return {k: v for k, v in fields.items() if v is not None}
+
+
 async def import_sent_leads(
     air: AirtableMultiClient,
     smartlead_api_key: str,
     campaign_slug: str,
+    *,
+    dialer_backend: str = "airtable",
+    prospecto_client: TwentyProspectoClient | None = None,
 ) -> dict[str, Any]:
-    """Trae al dialer los leads de `campaign_slug` que ya recibieron email."""
+    """Trae al dialer los leads de `campaign_slug` que ya recibieron email.
+
+    El ORIGEN de lectura es siempre Airtable ("duendes OUTREACH"). El DESTINO de
+    escritura sigue `dialer_backend`:
+      - "airtable" (default) → crea en `malaga` de Airtable (flujo vivo).
+      - "twenty"             → crea el `prospecto` en Twenty vía `prospecto_client`.
+    """
     cfg = CAMPAIGNS.get(campaign_slug)
     if not cfg:
         raise DespachosImportError(f"Campaña desconocida: {campaign_slug}")
@@ -115,14 +165,24 @@ async def import_sent_leads(
         if em:
             leads_by_email[em] = r.get("fields", {})
 
-    # 3. Emails ya presentes en el dialer (idempotencia)
-    existing = await air.list_records(
-        BASE_LUCIA, TABLE_MALAGA, fields=["Email contacto"], max_records=2000
-    )
-    in_dialer = {
-        (r.get("fields", {}).get("Email contacto") or "").lower().strip()
-        for r in existing
-    }
+    use_twenty = dialer_backend == "twenty"
+    if use_twenty and prospecto_client is None:
+        raise DespachosImportError(
+            "dialer_backend='twenty' pero no se pasó prospecto_client"
+        )
+
+    # 3. Emails ya presentes en el dialer (idempotencia), en el backend activo
+    if use_twenty:
+        nodes = await prospecto_client.list_all()
+        in_dialer = {(n.get("email") or "").lower().strip() for n in nodes}
+    else:
+        existing = await air.list_records(
+            BASE_LUCIA, TABLE_MALAGA, fields=["Email contacto"], max_records=2000
+        )
+        in_dialer = {
+            (r.get("fields", {}).get("Email contacto") or "").lower().strip()
+            for r in existing
+        }
     in_dialer.discard("")
 
     # 4. Crear los enviados que existen en origen y aún no están en el dialer
@@ -136,12 +196,17 @@ async def import_sent_leads(
             skipped_no_lead += 1
             continue
         try:
-            await air.create_record(
-                BASE_LUCIA,
-                TABLE_MALAGA,
-                _lead_to_prospect_fields(lead, label),
-                typecast=True,
-            )
+            if use_twenty:
+                await prospecto_client.create(
+                    _lead_to_prospecto_twenty_fields(lead, label)
+                )
+            else:
+                await air.create_record(
+                    BASE_LUCIA,
+                    TABLE_MALAGA,
+                    _lead_to_prospect_fields(lead, label),
+                    typecast=True,
+                )
             created += 1
             in_dialer.add(em)
         except Exception as exc:  # noqa: BLE001
