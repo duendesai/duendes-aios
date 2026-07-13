@@ -19,6 +19,9 @@ from typing import Any, Optional
 
 import httpx
 
+from services.crm.models import option_value
+from services.prospecto_twenty import TwentyProspectoClient
+
 logger = logging.getLogger(__name__)
 
 # Categorías Smartlead que indican "no llamar más"
@@ -141,12 +144,25 @@ async def sync_campaign(
     airtable_api_key: str,
     campaign_id: int = DEFAULT_CAMPAIGN_ID,
     campaign_name: str = "Fisios Malaga May 26",
+    dialer_backend: str = "airtable",
+    prospecto_client: TwentyProspectoClient | None = None,
 ) -> dict[str, Any]:
-    """Ejecuta el sync. Devuelve un dict con métricas para el log/respuesta."""
+    """Ejecuta el sync. Devuelve un dict con métricas para el log/respuesta.
+
+    El upsert de la tabla `Emails` de Airtable NO cambia (queda pendiente decidir con
+    Oscar si esa tabla sigue viva o se desactiva). Lo que sí sigue `dialer_backend` es
+    el marcado de "No llamar" (opt-out de email), que es el paso con implicación de
+    cumplimiento: en modo "twenty" el `noLlamar=true` va al `prospecto` de Twenty; en
+    "airtable" (default) va a `malaga`, como hasta ahora.
+    """
     if not smartlead_api_key:
         raise SmartleadSyncError("SMARTLEAD_API_KEY vacía")
     if not airtable_api_key:
         raise SmartleadSyncError("AIRTABLE_API_KEY vacía")
+    if dialer_backend == "twenty" and prospecto_client is None:
+        raise SmartleadSyncError(
+            "dialer_backend='twenty' pero no se pasó prospecto_client"
+        )
 
     started_at = datetime.now(timezone.utc)
 
@@ -184,7 +200,9 @@ async def sync_campaign(
                 by_email_destino.setdefault(ed, []).append(r["id"])
 
         created = updated = orphan = 0
-        do_not_call: list[tuple[str, str, str]] = []  # (prospect_id, email, motivo)
+        # (email, motivo): por EMAIL, no por record de Airtable, para que el marcado
+        # funcione también en modo twenty (donde el id de malaga no aplica).
+        do_not_call: list[tuple[str, str]] = []
 
         for stat in stats:
             email = (stat.get("lead_email") or "").lower().strip()
@@ -239,33 +257,63 @@ async def sync_campaign(
             if not prospect_id:
                 orphan += 1
 
-            if prospect_id and (category in CATEGORIES_DO_NOT_CALL or stat.get("is_unsubscribed")):
+            if category in CATEGORIES_DO_NOT_CALL or stat.get("is_unsubscribed"):
                 motivo = "Unsubscribed" if stat.get("is_unsubscribed") else CATEGORY_NAMES.get(category, "")
-                do_not_call.append((prospect_id, email, motivo))
+                do_not_call.append((email, motivo))
 
-        # Marca No llamar
+        # Marca No llamar en el backend activo del dialer
         marked = 0
-        for pid, em, motivo in do_not_call:
-            try:
-                today = datetime.utcnow().strftime("%Y-%m-%d")
-                await _airtable(
-                    client,
-                    airtable_api_key,
-                    "PATCH",
-                    f"{TABLE_MALAGA}/{pid}",
-                    json={
-                        "fields": {
-                            "No llamar": True,
-                            "Estado": "No llamar",
-                            "Motivo pérdida": "Robinson/DNC" if motivo == "Unsubscribed" else "Otra",
-                            "Notas": f"Smartlead detectó '{motivo}' el {today}",
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if dialer_backend == "twenty":
+            # email → id del prospecto en Twenty
+            tw_nodes = await prospecto_client.list_all()
+            email_to_tw = {
+                (n.get("email") or "").lower().strip(): n["id"]
+                for n in tw_nodes
+                if n.get("email")
+            }
+            for em, motivo in do_not_call:
+                tw_id = email_to_tw.get(em)
+                if not tw_id:
+                    continue
+                try:
+                    await prospecto_client.update(
+                        tw_id,
+                        {
+                            "noLlamar": True,
+                            "estado": option_value("No llamar"),
+                            "outcome": option_value("no_llamar"),
+                            "motivoPerdida": "Robinson/DNC" if motivo == "Unsubscribed" else "Otra",
+                            "notas": f"Smartlead detectó '{motivo}' el {today}",
                         },
-                        "typecast": True,
-                    },
-                )
-                marked += 1
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("Fallo marcando No llamar para %s: %s", em, exc)
+                    )
+                    marked += 1
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Fallo marcando noLlamar en Twenty para %s: %s", em, exc)
+        else:
+            for em, motivo in do_not_call:
+                pid = email_to_prospect.get(em)
+                if not pid:
+                    continue
+                try:
+                    await _airtable(
+                        client,
+                        airtable_api_key,
+                        "PATCH",
+                        f"{TABLE_MALAGA}/{pid}",
+                        json={
+                            "fields": {
+                                "No llamar": True,
+                                "Estado": "No llamar",
+                                "Motivo pérdida": "Robinson/DNC" if motivo == "Unsubscribed" else "Otra",
+                                "Notas": f"Smartlead detectó '{motivo}' el {today}",
+                            },
+                            "typecast": True,
+                        },
+                    )
+                    marked += 1
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Fallo marcando No llamar para %s: %s", em, exc)
 
         # Breakdown
         by_status: dict[str, int] = {}
