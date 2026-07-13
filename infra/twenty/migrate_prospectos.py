@@ -155,7 +155,7 @@ def _text(v):
     return str(v)
 
 
-def map_record(rec: dict) -> dict:
+def map_record(rec: dict, phone_field: str = "phone") -> dict:
     f = rec.get("fields", {})
     p: dict = {"airtableId": rec["id"]}
 
@@ -164,7 +164,7 @@ def map_record(rec: dict) -> dict:
             p[key] = val
 
     put("name", _text(f.get("title") or f.get("Name")))
-    put("phone", _text(f.get("phone")))
+    put("phone", _text(f.get(phone_field)))
     put("estado", _sel("estado", f.get("Estado"), ESTADO_ALIAS))
     put("prioridad", _sel("prioridad", f.get("Prioridad")))
     put("campana", _sel("campana", f.get("Campaña")))
@@ -205,6 +205,9 @@ def main():
     ap.add_argument("--table", default=DEFAULT_TABLE)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--limit", type=int, default=0, help="0 = todos")
+    ap.add_argument("--phone-field", default="phone",
+                    help="Campo Airtable de origen del teléfono "
+                         "(abogados tblJmR36eAILpjiRM: 'Attachment Summary')")
     args = ap.parse_args()
 
     records = read_airtable(args.base, args.table)
@@ -220,7 +223,7 @@ def main():
 
     created = skipped = errors = 0
     for rec in to_do:
-        payload = map_record(rec)
+        payload = map_record(rec, args.phone_field)
         name = payload.get("name", "(sin nombre)")
         if args.dry_run:
             print(f"  [dry] {name} | estado={payload.get('estado')} "
